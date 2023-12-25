@@ -24,38 +24,42 @@ __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023 Overdjoker048'
 __version__ = '1.0'
-__all__ = ['CLI', 'echo', 'prompt', 'write_logs']
+__all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored']
 
-import time
+from colorama import init
+from time import sleep
 import inspect
 from datetime import datetime
 import os
-import platform
+from platform import system
+
+init()
 
 class CLI(Exception):
     def __init__(self,
                  prompt: str = "Python@CLI\\>",
                  not_exist: str = "This command does not exist.\nDo help to get the list of existing commands.",
                  logs: bool = True,
-                 animation: bool = True,
-                 cooldown: float or int = 0.1,
-                 help_cmd: bool = True
+                 anim: bool = True,
+                 cool: float or int = 0.1,
+                 help_cmd: bool = True,
+                 color: tuple or str = "FFFFFF"
                  ) -> None:
         """
         This object allows the creation of the CLI. The prompt parameter defines the 
         text that will be displayed in the terminal to enter the command. The not_exist 
         parameter will define the text that is displayed when a command does not exist.
         The logs parameter allows you to choose whether or not you want everything 
-        displayed in the terminal to be rewritten in the logs. The animation and 
-        cooldown parameters will define the display of CLI messages. Finally there is the
+        displayed in the terminal to be rewritten in the logs. The anim and 
+        cool parameters will define the display of CLI messages. Finally there is the
         help_cmd parameter which allows you to choose whether or not you want the CLI's 
         default help command.
         To launch the CLI you must use the run method of the CLI object.
 
-        Exemple usage::
+        Usage example::
 
             >>> import PyCLI
-            >>> cli = PyCLI.CLI(prompt="Python@CLI\\>", logs=True, animation=True, cooldown=15, help_cmd=True, not_exist="This command does not exist.\nDo help to get the list of existing commands.")
+            >>> cli = PyCLI.CLI(prompt="Python@CLI\\>", logs=True, anim=True, cool=15, help_cmd=True, not_exist="This command does not exist.\nDo help to get the list of existing commands.")
             >>> @cli.command()
             >>> def hello_world():
             >>>     print("Hello World")
@@ -65,11 +69,12 @@ class CLI(Exception):
         self.prompt = prompt
         self.not_exist = not_exist
         self.logs = logs
-        self.animation = animation
-        self.cooldown = cooldown
+        self.anim = anim
+        self.cool = cool
+        self.color = color
 
-        if platform.system() == "Windows": self.__clear_cmd = "cls"
-        elif platform.system() in ["Linux", "Darwin"]: self.__clear_cmd = "reset"
+        if system() == "Windows": self.__clear_cmd = "cls"
+        elif system() in ["Linux", "Darwin"]: self.__clear_cmd = "reset"
         
         if help_cmd:
             @self.command(alias=["?"], doc=self.help.__doc__)
@@ -97,7 +102,7 @@ class CLI(Exception):
         don't, the command name will be the same name as the function. And for the description
         you can put it in doc form for your functions.
 
-        Exemples usages::
+        Usage example::
 
             >>> import PyCLI
             >>> cli = PyCLI.CLI()
@@ -123,7 +128,7 @@ class CLI(Exception):
                 types = []
                 args = []
                 for arg in inspect.signature(func).parameters.items():
-                    types.append(str(arg[1].annotation))
+                    types.append(arg[1].annotation)
                     args.append(f"[{arg[0]}]")
                 exist = False
                 for nmb, value in enumerate(self.__cmd):
@@ -171,12 +176,13 @@ class CLI(Exception):
             if i["doc"] is not None:
                 doc += i["doc"]
             text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+" ".join(map(str, i["args"]))+doc+"\n"
-        echo(text[:-1], animation=self.animation, cooldown=self.cooldown, logs=self.logs)
+        echo(text[:-1], anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
 
     def __decode(self, tpe: object, value: any) -> object:
+        if tpe == inspect._empty:
+            tpe = str
         try:
             for member in tpe.__args__:
-                print(member)
                 try:
                     return member(value)
                 except ValueError: 
@@ -191,7 +197,7 @@ class CLI(Exception):
         while True:
             try:
                 self.__cmd = sorted(self.__cmd, key=lambda x: x["name"])
-                entry = prompt(self.prompt, animation=self.animation, cooldown=self.cooldown).lower()
+                entry = prompt(self.prompt, anim=self.anim, cool=self.cool).lower()
                 exist = False
                 for cmd in self.__cmd:
                     if cmd["name"] == entry.split(" ")[0] or entry.split(" ")[0] in cmd["alias"]:
@@ -202,7 +208,7 @@ class CLI(Exception):
                         cmd["function"](*args)
                         break
                 if not exist: 
-                    echo(self.not_exist, animation=self.animation, cooldown=self.cooldown, logs=self.logs)
+                    echo(self.not_exist, anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
             except KeyboardInterrupt:
                 return
             except Exception as e:
@@ -212,62 +218,62 @@ class CLI(Exception):
 def echo(*values: object,
          sep: str = " ",
          end: str = "\n",
-         animation: bool = True,
-         cooldown: float or int = 0.1,
+         anim: bool = True,
+         cool: float or int = 0.1,
+         color: tuple or str = "FFFFFF",
          logs: bool = True
          ) -> None:
     """
     The echo method works like the print method which is already implemented in python but has a progressive 
-    display system if the value of the animation parameter is set to True and also has a logging system that 
-    writes the text you enter to the daily logs which is by default enabled. The cooldown parameter corresponds
+    display system if the value of the anim parameter is set to True and also has a logging system that 
+    writes the text you enter to the daily logs which is by default enabled. The cool parameter corresponds
     to the exposure time before displaying the next character (in MS) of the text you have entered if the 
-    animation parameter is set to True.
+    anim parameter is set to True.
     
 
-    Exemple usage::
+    Usage example::
 
         >>> import PyCLI
-        >>> PyCLI.echo("Hello World", animation=True, cooldown=15, logs=True, end="\n", sep=" ")
+        >>> PyCLI.echo("Hello World", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
     output = sep.join(map(str, values))
-    for line in output.split("\n"):
-        if animation:
-            text = ""
-            for i in line:
-                text += i
-                print(text, end="\r")
-                time.sleep(cooldown / 1000)
-        print(line, end=end)
+    if anim:
+        for char in output:
+            print(colored(char, color), end="", flush=True)
+            sleep(cool / 1000)
+        print(end=end)
+    else:
+        print(colored(output, color), end=end)
     if logs:
         write_logs(output)
 
 
 def prompt(__prompt: object = "",
-           animation: bool = True,
-           cooldown: float or int = 0.1,
+           anim: bool = True,
+           cool: float or int = 0.1,
+           color: tuple or str = "FFFFFF",
            logs: bool = True
            ) -> str:
     """
     The prompt method works like the input method which is already implemented in python but has a progressive display 
-    system if the value of the animation parameter is set to True and also includes a logging system that writes the 
-    text that the user will respond to in the daily logs. The logging system is enabled by default. The cooldown 
+    system if the value of the anim parameter is set to True and also includes a logging system that writes the 
+    text that the user will respond to in the daily logs. The logging system is enabled by default. The cool 
     parameter corresponds to the exposure time before displaying the next character (in MS) of the text you have entered
-    if the animation parameter is set to True.
+    if the anim parameter is set to True.
 
 
-    Exemple usage::
+    Usage example::
 
         >>> import PyCLI
-        >>> PyCLI.prompt("What's your name ?", animation=True, cooldown=15, logs=True, end="\n", sep=" ")
+        >>> PyCLI.prompt("What's your name ?", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
-    for line in str(__prompt).split("\n"):
-        if animation:
-            text = ""
-            for i in line:
-                text += i
-                print(text, end="\r")
-                time.sleep(cooldown / 1000)
-    returned = input(str(__prompt))
+    if anim:
+        for i in __prompt:
+            print(colored(i, color), end="", flush=True)
+            sleep(cool / 1000)
+    else:
+        print(colored(str(__prompt), color), end="")   
+    returned = input()
     if logs:
         write_logs(returned)
     return returned
@@ -281,7 +287,7 @@ def write_logs(*values: object,
     The write_logs method allows to write in the daily logs. This method works like the print method which is already 
     implemented in python for the sep and end parameters.
 
-    Exemple usage::
+    Usage examples::
 
         >>> import PyCLI
         >>> PyCLI.write_logs("CLI was starting.")
@@ -291,3 +297,24 @@ def write_logs(*values: object,
         os.mkdir("latest")
     with open(f"latest/{datetime.today().date()}.log", "a", encoding="UTF-8") as file:
         file.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}")
+
+
+def colored(text: str, 
+            color: tuple or str = "FFFFFF"
+            ) -> str:
+    """
+    This method allows you to convert non-colored text to colored text. The color argument supports 
+    tuples for writing the color code in rgb format and str for hexadecimal format.
+    
+    Usage examples::
+    
+        >>> import PyCLI
+        >>> print(PyCLI.colored("Hello World", "#FF0000"))
+
+        >>> import PyCLI
+        >>> print(PyCLI.colored("Hello World", (255, 0, 0)))
+    """
+    if type(color) == str:
+        return f"\033[38;2;{int(color[0:2], 16)};{int(color[2:4], 16)};{int(color[4:6], 16)}m{text}\033[0m"
+    elif type(color) == tuple:
+        return f"\033[38;2;{color[0]};{color[1]};{color[2]}m{text}\033[0m"
