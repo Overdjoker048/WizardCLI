@@ -197,7 +197,7 @@ class CLI(Exception):
         while True:
             try:
                 self.__cmd = sorted(self.__cmd, key=lambda x: x["name"])
-                entry = prompt(self.prompt, anim=self.anim, cool=self.cool).lower()
+                entry = prompt(self.prompt, anim=self.anim, cool=self.cool, color=self.color, logs=self.logs).lower()
                 exist = False
                 for cmd in self.__cmd:
                     if cmd["name"] == entry.split(" ")[0] or entry.split(" ")[0] in cmd["alias"]:
@@ -300,7 +300,7 @@ def write_logs(*values: object,
 
 
 def colored(text: str, 
-            color: tuple or str = "FFFFFF"
+            color: tuple or str
             ) -> str:
     """
     This method allows you to convert non-colored text to colored text. The color argument supports 
