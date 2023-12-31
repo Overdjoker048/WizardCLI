@@ -219,7 +219,7 @@ def echo(*values: object,
          end: str = "\n",
          anim: bool = True,
          cool: float | int = 0.1,
-         color: tuple | str = "#FFFFFF",
+         color: tuple | str = "FFFFFF",
          logs: bool = False
          ) -> None:
     """
@@ -251,8 +251,8 @@ def echo(*values: object,
 def prompt(__prompt: object = "",
            anim: bool = True,
            cool: float | int = 0.1,
-           color: tuple | str = "#FFFFFF",
-           logs: bool = True
+           color: tuple | str = "FFFFFF",
+           logs: bool = False
            ) -> str:
     """
     The prompt method works like the input method which is already implemented in python but has a progressive display 
@@ -315,7 +315,6 @@ def colored(text: str,
         >>> print(PyCLI.colored("Hello World", (255, 0, 0)))
     """
     if type(color) == str:
-        color = color[1:]
         return f"\033[38;2;{int(color[0:2], 16)};{int(color[2:4], 16)};{int(color[4:6], 16)}m{text}\033[0m"
     elif type(color) == tuple:
         return f"\033[38;2;{color[0]};{color[1]};{color[2]}m{text}\033[0m"
