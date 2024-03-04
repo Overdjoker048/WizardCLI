@@ -22,8 +22,8 @@ __encoding__ = "UTF-8"
 __title__ = 'PyCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
-__copyright__ = 'Copyright (c) 2023 Overdjoker048'
-__version__ = '1.0'
+__copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
+__version__ = '1.1'
 __all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored']
 
 from colorama import init
@@ -31,19 +31,22 @@ from time import sleep
 import inspect
 from datetime import datetime
 import os
-from platform import system
+from platform import system as osname
 
 init()
+home = "\\".join(__file__.split("\\")[:-1])
 
 class CLI(Exception):
     def __init__(self,
-                 prompt: str = "Python@CLI\\>",
-                 not_exist: str = "This command does not exist.\nDo help to get the list of existing commands.",
+                 prompt: str = "[Python-Cli]@[{}]\\>",
+                 title: str or None = None,
                  logs: bool = True,
                  anim: bool = True,
                  cool: float or int = 0.1,
+                 color: tuple or str or None = None,
                  help_cmd: bool = True,
-                 color: tuple or str = "FFFFFF"
+                 not_exist: str = "This command does not exist.\nDo help to get the list of existing commands.",
+                 unexpected: str = "An unexpected error occurred: {}"
                  ) -> None:
         """
         This object allows the creation of the CLI. The prompt parameter defines the 
@@ -65,16 +68,26 @@ class CLI(Exception):
             >>>     print("Hello World")
             >>> cli.run()
         """
+        if title is not None:
+            if osname() == "Windows": 
+                os.system(f"title {title}")
+            elif osname() in ["Linux", "Darwin"]: 
+                os.system(f"echo -n '\033]0;{title}\007'")
+
         self.__cmd = []
         self.prompt = prompt
-        self.not_exist = not_exist
+        self.path = home
         self.logs = logs
         self.anim = anim
         self.cool = cool
         self.color = color
+        self.not_exist = not_exist
+        self.unexpected = unexpected
 
-        if system() == "Windows": self.__clear_cmd = "cls"
-        elif system() in ["Linux", "Darwin"]: self.__clear_cmd = "reset"
+        if osname() == "Windows": 
+            self.__clear_cmd = "cls"
+        elif osname() in ["Linux", "Darwin"]: 
+            self.__clear_cmd = "reset"
         
         if help_cmd:
             @self.command(alias=["?"], doc=self.help.__doc__)
@@ -90,6 +103,10 @@ class CLI(Exception):
         @self.command(alias=["exit"], doc=self.leave.__doc__)
         def leave() -> None:
             self.leave()
+
+        @self.command(alias=["cd"], doc=self.change_directory.__doc__)
+        def change_directory(path: str = "\\".join(__file__.split("\\")[:-1])) -> None:
+            self.change_directory(path)
 
     def command(self,
                 name: str = None,
@@ -155,6 +172,7 @@ class CLI(Exception):
                         "types": types,
                         "alias": alias,
                     })
+                self.__cmd = sorted(self.__cmd, key=lambda x: x["name"])
             return wrapper(name=name if name else func.__name__, 
                            doc=doc if doc else func.__doc__, 
                            alias=alias)
@@ -175,8 +193,22 @@ class CLI(Exception):
             doc = ""
             if i["doc"] is not None:
                 doc += i["doc"]
-            text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+" ".join(map(str, i["args"]))+doc+"\n"
-        echo(text[:-1], anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+            if len(i["args"]) != 0:
+                text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+" ".join(map(str, i["args"]))+" "+doc+"\n"
+            else:
+                text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+doc+"\n"
+        echo(text[:-1], anim=self.anim, cool=self.cool, color=self.color)
+
+    def change_directory(self, path : str = "\\".join(__file__.split("\\")[:-1])) -> None:
+        "Allows you to change the location of the terminal in your files."
+        if os.path.isdir(os.path.normpath(self.path+"\\"+path)):
+            path = os.path.normpath(self.path+"\\"+path)
+        else:
+            path = os.path.normpath(path)
+        if os.path.isdir(path):
+            self.path = str(path).title()
+        else:
+            echo("The path is invalid.", anim=self.anim, cool=self.cool, color=self.color)
 
     def __decode(self, tpe: object, value: any) -> object:
         if tpe == inspect._empty:
@@ -196,8 +228,7 @@ class CLI(Exception):
             write_logs(*self.__cmd)
         while True:
             try:
-                self.__cmd = sorted(self.__cmd, key=lambda x: x["name"])
-                entry = prompt(self.prompt, anim=self.anim, cool=self.cool, color=self.color, logs=self.logs).lower()
+                entry = prompt(self.prompt.format(self.path), anim=self.anim, cool=self.cool, color=self.color).lower()
                 exist = False
                 for cmd in self.__cmd:
                     if cmd["name"] == entry.split(" ")[0] or entry.split(" ")[0] in cmd["alias"]:
@@ -208,19 +239,18 @@ class CLI(Exception):
                         cmd["function"](*args)
                         break
                 if not exist: 
-                    echo(self.not_exist, anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                    echo(self.not_exist.format(entry.split(" ")[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
             except KeyboardInterrupt:
                 return
             except Exception as e:
-                print(e)
-                continue
+                echo(self.unexpected.format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
 
 def echo(*values: object,
          sep: str = " ",
          end: str = "\n",
          anim: bool = True,
          cool: float or int = 0.1,
-         color: tuple or str = "FFFFFF",
+         color: tuple or str or None = None,
          logs: bool = True
          ) -> None:
     """
@@ -251,7 +281,7 @@ def echo(*values: object,
 def prompt(__prompt: object = "",
            anim: bool = True,
            cool: float or int = 0.1,
-           color: tuple or str = "FFFFFF",
+           color: tuple or str or None = None,
            logs: bool = True
            ) -> str:
     """
@@ -300,7 +330,7 @@ def write_logs(*values: object,
 
 
 def colored(text: str, 
-            color: tuple or str
+            color: tuple or str or None = None
             ) -> str:
     """
     This method allows you to convert non-colored text to colored text. The color argument supports 
@@ -309,12 +339,14 @@ def colored(text: str,
     Usage examples::
     
         >>> import PyCLI
-        >>> print(PyCLI.colored("Hello World", "#FF0000"))
+        >>> print(PyCLI.colored("Hello World", "FF0000"))
 
         >>> import PyCLI
         >>> print(PyCLI.colored("Hello World", (255, 0, 0)))
     """
-    if type(color) == str:
+    if isinstance(color, str):
         return f"\033[38;2;{int(color[0:2], 16)};{int(color[2:4], 16)};{int(color[4:6], 16)}m{text}\033[0m"
-    elif type(color) == tuple:
+    elif isinstance(color, tuple):
         return f"\033[38;2;{color[0]};{color[1]};{color[2]}m{text}\033[0m"
+    elif color is None:
+        return text
