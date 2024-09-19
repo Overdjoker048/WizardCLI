@@ -23,24 +23,27 @@ __title__ = 'PyCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
-__version__ = '1.1'
-__all__ = ['CLI', 'echo', 'prompt', 'write_logs', "colored"]
+__version__ = '1.2.0'
+__all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored', 'gram']
 
-from colorama import init
-from time import sleep
+import colorama
 import inspect
 from datetime import datetime
 import os
-from platform import system as osname
+import platform
+import time
+import sys
+import shlex
 
-init()
+colorama.init()
 home = "\\".join(__file__.split("\\")[:-1])
 
-class CLI(Exception):
+class CLI:
     def __init__(self,
-                 prompt: str | None = "[Python-Cli]@[{}]\\>",
+                 prompt: str | None = "[{}]@[{}]\\>",
+                 user: str = "Python-Cli",
                  title: str | None = None,
-                 logs: bool = False,
+                 logs: bool = True,
                  anim: bool = True,
                  cool: float | int = 0.1,
                  color: tuple | str | None = None,
@@ -59,7 +62,7 @@ class CLI(Exception):
         default help command.
         To launch the CLI you must use the run method of the CLI object.
 
-        Usage example::
+        Example of use::
 
             >>> import PyCLI
             >>> cli = PyCLI.CLI(prompt="Python@CLI\\>", logs=True, anim=True, cool=15, help_cmd=True, not_exist="This command does not exist.\nDo help to get the list of existing commands.")
@@ -69,12 +72,13 @@ class CLI(Exception):
             >>> cli.run()
         """
         if title is not None:
-            match osname():
+            match platform.system():
                 case "Windows": os.system(f"title {title}")
                 case "Linux" | "Darwin": os.system(f"echo -n '\033]0;{title}\007'")
 
-        self.__cmd = []
+        self.__cmd = {}
         self.prompt = prompt
+        self.user = user
         self.path = home
         self.logs = logs
         self.anim = anim
@@ -83,7 +87,7 @@ class CLI(Exception):
         self.not_exist = not_exist
         self.unexpected = unexpected
 
-        match osname():
+        match platform.system():
             case "Windows": self.__clear_cmd = "cls"
             case "Linux" | "Darwin": self.__clear_cmd = "clear"
 
@@ -94,17 +98,17 @@ class CLI(Exception):
         else:
             del self.help
 
-        @self.command(alias=["exit"], doc=self.leave.__doc__)
-        def leave() -> None:
-            self.leave()
+        @self.command(alias=["cd"], doc=self.change_directory.__doc__)
+        def change_directory(path: str = home) -> None:
+            self.change_directory(path)
 
         @self.command(alias=[self.__clear_cmd], name="clear-host", doc=self.clear_host.__doc__)
         def clear_host() -> None:
             self.clear_host()
 
-        @self.command(alias=["cd"], doc=self.change_directory.__doc__)
-        def change_directory(path: str = home) -> None:
-            self.change_directory(path)
+        @self.command(alias=["exit"], doc=self.leave.__doc__)
+        def leave() -> None:
+            self.leave()
 
     def command(self,
                 name: str = None,
@@ -117,7 +121,7 @@ class CLI(Exception):
         don't, the command name will be the same name as the function. And for the description
         you can put it in doc form for your functions.
 
-        Exemples usages::
+        Examples of use::
 
             >>> import PyCLI
             >>> cli = PyCLI.CLI()
@@ -145,33 +149,15 @@ class CLI(Exception):
                 for arg in inspect.signature(func).parameters.items():
                     types.append(arg[1].annotation)
                     args.append(f"[{arg[0]}]")
-
-                exist = False
-                for nmb, value in enumerate(self.__cmd):
-                    for i in alias:
-                        for j in value["alias"]:
-                            if i == j:
-                                raise CLI(f'[cmd: {value["name"]}] Alias "{i}" is already used.')
-                    if value["name"] == name:
-                        self.__cmd[nmb] = {
-                            "name": name,
-                            "doc": doc,
-                            "function": func,
-                            "args": args,
-                            "types": types,
-                            "alias": alias,
-                        }
-                        exist = True
-                if not exist:
-                    self.__cmd.append({
-                        "name": name,
+                self.__cmd[name] = {
                         "doc": doc,
                         "function": func,
                         "args": args,
                         "types": types,
                         "alias": alias,
-                    })
-                self.__cmd = sorted(self.__cmd, key=lambda x: x["name"])
+                }
+                for i in alias:
+                    self.__cmd[i] = name
             return wrapper(name=name if name else func.__name__, 
                            doc=doc if doc else func.__doc__, 
                            alias=alias)
@@ -190,14 +176,15 @@ class CLI(Exception):
         text = ""
         for i in self.__cmd:
             doc = ""
-            if i["doc"] is not None:
-                doc += i["doc"]
-            if len(i["args"]) != 0:
-                text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+" ".join(map(str, i["args"]))+" "+doc+"\n"
-            else:
-                text += "Alias    "+ ", ".join(i["alias"])+" -> "+i["name"]+" "+doc+"\n"
+            if type(self.__cmd[i]) is not str:
+                if self.__cmd[i]["doc"] is not None:
+                    doc += self.__cmd[i]["doc"]
+                if len(self.__cmd[i]["args"]) != 0:
+                    text += "Alias    "+ ", ".join(self.__cmd[i]["alias"])+" -> "+i+" "+" ".join(map(str, self.__cmd[i]["args"]))+" "+doc+"\n"
+                else:
+                    text += "Alias    "+ ", ".join(self.__cmd[i]["alias"])+" -> "+i+" "+doc+"\n"
         echo(text[:-1], anim=self.anim, cool=self.cool, color=self.color)
-    
+
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
         if os.path.isdir(os.path.normpath(self.path+"\\"+path)):
@@ -224,26 +211,23 @@ class CLI(Exception):
     def run(self) -> None:
         "This method of the CLI object allows you to launch the CLI after you have created all your commands."
         if self.logs:
-            write_logs(*self.__cmd)
+            write_logs(self.__cmd)
         while True:
             try:
-                entry = prompt(self.prompt.format(self.path), anim=self.anim, cool=self.cool,  color=self.color, logs=self.logs).lower()
-                exist = False
-                for cmd in self.__cmd:
-                    if cmd["name"] == entry.split(" ")[0] or entry.split(" ")[0] in cmd["alias"]:
-                        exist = True
-                        args = []
-                        for nmb, arg in enumerate(entry.split(" ")[1:len(cmd["args"])+1]):
-                            args.append(self.__decode(cmd["types"][nmb], arg))
-                        cmd["function"](*args)
-                        break
-                if not exist: 
-                    echo(self.not_exist.format(entry.split(" ")[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                entry = shlex.split(prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool,  color=self.color, logs=self.logs).lower())
+                cmd = self.__cmd[entry[0]]
+                if isinstance(cmd, str):
+                    cmd = self.__cmd[cmd]
+                args = []
+                for nmb, arg in enumerate(entry[1:len(cmd["args"])+1]):
+                    args.append(self.__decode(cmd["types"][nmb], arg))
+                cmd["function"](*args)
             except KeyboardInterrupt:
                 break
+            except KeyError:
+                echo(self.not_exist.format(entry[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
             except Exception as e:
                 echo(self.unexpected.format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
-                continue
 
 def echo(*values: object,
          sep: str = " ",
@@ -260,17 +244,17 @@ def echo(*values: object,
     to the exposure time before displaying the next character (in MS) of the text you have entered if the 
     anim parameter is set to True.
 
-
-    Usage example::
+    Example of use::
 
         >>> import PyCLI
         >>> PyCLI.echo("Hello World", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
     output = sep.join(map(str, values))
+    times =  cool / len(output)
     if anim:
         for char in output:
             print(colored(char, color), end="", flush=True)
-            sleep(cool/1000)
+            time.sleep(times)
         print(end=end)
     else:
         print(colored(output, color), end=end)
@@ -292,16 +276,16 @@ def prompt(__prompt: object = "",
     parameter corresponds to the exposure time before displaying the next character (in MS) of the text you have entered
     if the anim parameter is set to True.
 
-
-    Usage example::
+    Example of use::
 
         >>> import PyCLI
         >>> PyCLI.prompt("What's your name ?", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
+    times =  cool / len(__prompt)
     if anim:
         for i in str(__prompt):
             print(colored(i, color), end="", flush=True)
-            sleep(cool / 1000)
+            time.sleep(times)
     else:
         print(colored(str(__prompt), color), end="")
     returned = input()
@@ -318,7 +302,7 @@ def write_logs(*values: object,
     The write_logs method allows to write in the daily logs. This method works like the print method which is already 
     implemented in python for the sep and end parameters.
 
-    Usage example::
+    Example of use::
 
         >>> import PyCLI
         >>> PyCLI.write_logs("CLI was starting.")
@@ -337,7 +321,7 @@ def colored(text: str,
     This method allows you to convert non-colored text to colored text. The color argument supports 
     tuples for writing the color code in rgb format and str for hexadecimal format.
 
-    Usage examples::
+    Examples of use::
 
         >>> import PyCLI
         >>> print(PyCLI.colored("Hello World", "FF0000"))
@@ -351,3 +335,14 @@ def colored(text: str,
         return f"\033[38;2;{color[0]};{color[1]};{color[2]}m{text}\033[0m"
     elif color is None:
         return text
+
+def gram(debug=False) -> None:
+    "Displays the amount of memory used overall by the program, the debug arguments allow you to display the amount of memory used by each variable."
+    memory = 0
+    all_vars = globals()
+    for index in all_vars:
+        imemory = sys.getsizeof(all_vars[index])
+        if debug:
+            print(index, imemory)
+        memory += imemory
+    print(f"[memory] {memory} bytes")
