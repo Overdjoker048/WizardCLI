@@ -26,13 +26,13 @@ __copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
 __version__ = '1.2.1'
 __all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored', 'gram']
 
-import sys
 import colorama
-import time
 import inspect
 from datetime import datetime
 import os
 import platform
+import time
+import sys
 import shlex
 
 colorama.init()
