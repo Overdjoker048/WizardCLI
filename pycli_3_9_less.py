@@ -23,7 +23,7 @@ __title__ = 'PyCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 __all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored', 'gram']
 
 import sys
@@ -33,6 +33,7 @@ import inspect
 from datetime import datetime
 import os
 import platform
+import shlex
 
 colorama.init()
 home = "\\".join(__file__.split("\\")[:-1])
@@ -73,7 +74,7 @@ class CLI:
         if title is not None:
             if platform.system() == "Windows": 
                 os.system(f"title {title}")
-            elif platform.system() in ["Linux", "Darwin"]: 
+            else: 
                 os.system(f"echo -n '\033]0;{title}\007'")
 
         self.__cmd = {}
@@ -87,10 +88,10 @@ class CLI:
         self.not_exist = not_exist
         self.unexpected = unexpected
 
-        if platform.system() == "Windows": 
+        if platform.system() == "Windows":
             self.__clear_cmd = "cls"
-        elif platform.system() in ["Linux", "Darwin"]: 
-            self.__clear_cmd = "reset"
+        else:
+            self.__clear_cmd = "clear"
 
         if help_cmd:
             @self.command(alias=["?"], doc=self.help.__doc__)
@@ -200,6 +201,7 @@ class CLI:
             echo("The path is invalid.", anim=self.anim, cool=self.cool, color=self.color)
 
     def __decode(self, tpe: object, value: any) -> object:
+        "Format arguments in the types chosen when creating commands."
         if tpe == inspect._empty:
             tpe = str
         try:
@@ -217,18 +219,18 @@ class CLI:
             write_logs(self.__cmd)
         while True:
             try:
-                entry = prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool,  color=self.color, logs=self.logs).lower()
-                cmd = self.__cmd[entry.split(" ")[0]]
+                entry = shlex.split(prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool,  color=self.color, logs=self.logs).lower())
+                cmd = self.__cmd[entry[0]]
                 if isinstance(cmd, str):
                     cmd = self.__cmd[cmd]
                 args = []
-                for nmb, arg in enumerate(entry.split(" ")[1:len(cmd["args"])+1]):
+                for nmb, arg in enumerate(entry[1:len(cmd["args"])+1]):
                     args.append(self.__decode(cmd["types"][nmb], arg))
                 cmd["function"](*args)
             except KeyboardInterrupt:
                 break
             except KeyError:
-                echo(self.not_exist.format(entry.split(" ")[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                echo(self.not_exist.format(entry[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
             except Exception as e:
                 echo(self.unexpected.format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
 
@@ -254,7 +256,8 @@ def echo(*values: object,
         >>> PyCLI.echo("Hello World", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
     output = sep.join(map(str, values))
-    times =  cool / len(output)
+    if not len(output) == 0:
+        times =  cool / len(output)
     if anim:
         for char in output:
             print(colored(char, color), end="", flush=True)
@@ -285,7 +288,8 @@ def prompt(__prompt: object = "",
         >>> import PyCLI
         >>> PyCLI.prompt("What's your name ?", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
-    times =  cool / len(__prompt)
+    if not len(__prompt) == 0:
+        times =  cool / len(__prompt)
     if anim:
         for i in __prompt:
             print(colored(i, color), end="", flush=True)
@@ -314,7 +318,7 @@ def write_logs(*values: object,
     text = sep.join(map(str, values)) + end
     if not os.path.exists("latest"):
         os.mkdir("latest")
-    with open(f"latest/{datetime.today().date()}.log", "a", encoding="UTF-8") as file:
+    with open(os.path.join("latest", f"{datetime.today().date()}.log"), "a", encoding="UTF-8") as file:
         file.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}")
 
 
@@ -336,12 +340,20 @@ def colored(text: str,
     if isinstance(color, str):
         return f"\033[38;2;{int(color[0:2], 16)};{int(color[2:4], 16)};{int(color[4:6], 16)}m{text}\033[0m"
     elif isinstance(color, tuple):
-        return f"\033[38;2;{color[0]};{color[1]};{color[2]}m{text}\033[0m"
+        return f"\033[38;2;{int(color[0])};{int(color[1])};{int(color[2])}m{text}\033[0m"
     elif color is None:
         return text
 
 def gram(debug=False) -> None:
-    "Displays the amount of memory used overall by the program, the debug arguments allow you to display the amount of memory used by each variable."
+    """
+    Displays the amount of memory used overall by the program, the debug arguments allow you to display 
+    the amount of memory used by each variable.
+
+    Examples of use::
+
+        >>> import PyCLI
+        >>> gram(debut=True)
+    """
     memory = 0
     all_vars = globals()
     for index in all_vars:
