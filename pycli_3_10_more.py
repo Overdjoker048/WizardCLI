@@ -196,7 +196,7 @@ class CLI:
 
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = os.apath.join(self.path, path)
+        npath = os.path.join(self.path, path)
         if os.path.isdir(npath):
             path = os.path.normpath(npath)
         else:
