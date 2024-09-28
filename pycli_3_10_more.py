@@ -36,9 +36,9 @@ import sys
 import shlex
 
 colorama.init()
-home = "\\".join(__file__.split("\\")[:-1])
 
 class CLI:
+    home = "\\".join(__file__.split("\\")[:-1])
     def __init__(self,
                  prompt: str | None = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
@@ -79,7 +79,7 @@ class CLI:
         self.__cmd = {}
         self.prompt = prompt
         self.user = user
-        self.path = home
+        self.path = CLI.home
         self.logs = logs
         self.anim = anim
         self.cool = cool
@@ -99,7 +99,7 @@ class CLI:
             del self.help
 
         @self.command(alias=["cd"], doc=self.change_directory.__doc__)
-        def change_directory(path: str = home) -> None:
+        def change_directory(path: str = CLI.home) -> None:
             self.change_directory(path)
 
         @self.command(alias=[self.__clear_cmd], name="clear-host", doc=self.clear_host.__doc__)
@@ -149,6 +149,8 @@ class CLI:
                 for arg in inspect.signature(func).parameters.items():
                     types.append(arg[1].annotation)
                     args.append(f"[{arg[0]}]")
+                if doc is None:
+                    doc = ""
                 self.__cmd[name] = {
                         "doc": doc,
                         "function": func,
@@ -174,21 +176,29 @@ class CLI:
     def help(self) -> None:
         "Displays info about terminal commands."
         text = ""
+        lna = 0
+        la = 0
         for i in self.__cmd:
-            doc = ""
             if not isinstance(self.__cmd[i], str):
-                if self.__cmd[i]["doc"] is not None:
-                    doc += self.__cmd[i]["doc"]
-                if len(self.__cmd[i]["args"]) != 0:
-                    text += "Alias    "+ ", ".join(self.__cmd[i]["alias"])+" -> "+i+" "+" ".join(map(str, self.__cmd[i]["args"]))+" "+doc+"\n"
-                else:
-                    text += "Alias    "+ ", ".join(self.__cmd[i]["alias"])+" -> "+i+" "+doc+"\n"
-        echo(text[:-1], anim=self.anim, cool=self.cool, color=self.color)
+                lnal = len(f"{i} {', '.join(self.__cmd[i]['args'])}")
+                if lnal > lna: lna = lnal
+                lal = len(", ".join(self.__cmd[i]["alias"]))
+                if lal > la: la = lal
+
+        for i in self.__cmd:
+            if not isinstance(self.__cmd[i], str):
+                alias = ", ".join(self.__cmd[i]["alias"])
+                alias += (la-len(alias))*" "
+                args = " ".join(map(str, self.__cmd[i]["args"]))
+                args+= (la-len(args))*" "
+                text += f"Alias    {alias} -> {i} {args}{(lna-(len(i)+len(args)+1))*" "} {self.__cmd[i]['doc']}\n"
+        echo(text, anim=self.anim, cool=self.cool, color=self.color)
 
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
-        if os.path.isdir(os.path.normpath(self.path+"\\"+path)):
-            path = os.path.normpath(self.path+"\\"+path)
+        npath = os.apath.join(self.path, path)
+        if os.path.isdir(npath):
+            path = os.path.normpath(npath)
         else:
             path = os.path.normpath(path)
         if os.path.isdir(path):
