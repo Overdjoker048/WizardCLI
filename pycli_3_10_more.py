@@ -38,7 +38,7 @@ import shlex
 colorama.init()
 
 class CLI:
-    home = "\\".join(__file__.split("\\")[:-1])
+    home = os.path.dirname(__file__)
     def __init__(self,
                  prompt: str | None = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
