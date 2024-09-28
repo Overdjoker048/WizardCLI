@@ -195,7 +195,7 @@ class CLI:
                 args = " ".join(map(str, self.__cmd[i]["args"]))
                 args+= (la-len(args))*" "
                 text += f"Alias    {alias} -> {i} {args}{(lna-(len(i)+len(args)+1))*" "} {self.__cmd[i]['doc']}\n"
-        echo(text, anim=self.anim, cool=self.cool, color=self.color)
+        echo(text[:-1], anim=self.anim, cool=self.cool, color=self.color)
 
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
@@ -240,8 +240,8 @@ class CLI:
                 break
             except KeyError:
                 echo(self.not_exist.format(entry[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
-            """except Exception as e:
-                echo(self.unexpected.format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)"""
+            except Exception as e:
+                echo(self.unexpected.format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
 
 def echo(*values: object,
          sep: str = " ",
