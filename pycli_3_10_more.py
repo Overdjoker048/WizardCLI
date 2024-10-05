@@ -23,7 +23,7 @@ __title__ = 'PyCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
-__version__ = '1.2.1'
+__version__ = '1.2.2'
 __all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored', 'gram']
 
 import colorama
@@ -40,13 +40,13 @@ colorama.init()
 class CLI:
     home = os.path.dirname(__file__)
     def __init__(self,
-                 prompt: str | None = "[{}]@[{}]\\>",
+                 prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
-                 title: str | None = None,
+                 title: str = None,
                  logs: bool = True,
                  anim: bool = True,
                  cool: float | int = 0.1,
-                 color: tuple | str | None = None,
+                 color: tuple | str = None,
                  help_cmd: bool = True,
                  not_exist: str = "{} doesn't exist.\nDo help to get the list of existing commands.",
                  unexpected: str = "An unexpected error occurred: {}"
@@ -178,25 +178,25 @@ class CLI:
         text = ""
         lna = 0
         la = 0
+        cmds = []
         for i in self.__cmd:
             if not isinstance(self.__cmd[i], str):
+                cmds.append(i)
                 lnal = len(f"{i} {', '.join(self.__cmd[i]['args'])}")
                 if lnal > lna: lna = lnal
                 lal = len(", ".join(self.__cmd[i]["alias"]))
                 if lal > la: la = lal
-
-        for i in self.__cmd:
-            if not isinstance(self.__cmd[i], str):
-                alias = ", ".join(self.__cmd[i]["alias"])
-                alias += (la-len(alias))*" "
-                args = " ".join(map(str, self.__cmd[i]["args"]))
-                args+= (la-len(args))*" "
-                text += f"Alias    {alias} -> {i} {args}{(lna-(len(i)+len(args)+1))*" "} {self.__cmd[i]['doc']}\n"
+        for i in cmds.srot():
+            alias = ", ".join(self.__cmd[i]["alias"])
+            alias += (la-len(alias))*" "
+            args = " ".join(map(str, self.__cmd[i]["args"]))
+            args+= (la-len(args))*" "
+            text += f"Alias    {alias} -> {i} {args}{(lna-(len(i)+len(args)+1))*" "} {self.__cmd[i]['doc']}\n"
         echo(text[:-1], anim=self.anim, cool=self.cool, color=self.color)
 
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = os.path.join(self.path, path)
+        npath = os.apath.join(self.path, path)
         if os.path.isdir(npath):
             path = os.path.normpath(npath)
         else:
@@ -245,8 +245,10 @@ def echo(*values: object,
          end: str = "\n",
          anim: bool = True,
          cool: float | int = 0.1,
-         color: tuple | str | None = None,
-         logs: bool = False
+         color: tuple | str = None,
+         logs: bool = False,
+         flush: bool = False,
+         file: None = None,
          ) -> None:
     """
     The echo method works like the print method which is already implemented in python but has a progressive 
@@ -261,15 +263,15 @@ def echo(*values: object,
         >>> PyCLI.echo("Hello World", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
     output = sep.join(map(str, values))
-    if not len(output) == 0:
+    if len(output) != 0:
         times =  cool / len(output)
     if anim:
         for char in output:
-            print(colored(char, color), end="", flush=True)
+            print(colored(char, color), end="", flush=flush, file=file)
             time.sleep(times)
         print(end=end)
     else:
-        print(colored(output, color), end=end)
+        print(colored(output, color), end=end, flush=flush, file=file)
 
     if logs:
         write_logs(output)
@@ -278,8 +280,9 @@ def echo(*values: object,
 def prompt(__prompt: object = "",
            anim: bool = True,
            cool: float | int = 0.1,
-           color: tuple | str | None = None,
-           logs: bool = False
+           color: tuple | str = None,
+           logs: bool = False,
+           flush: bool = False
            ) -> str:
     """
     The prompt method works like the input method which is already implemented in python but has a progressive display 
@@ -293,14 +296,14 @@ def prompt(__prompt: object = "",
         >>> import PyCLI
         >>> PyCLI.prompt("What's your name ?", anim=True, cool=15, logs=True, end="\n", sep=" ")
     """
-    if not len(__prompt) == 0:
+    if len(__prompt) != 0:
         times =  cool / len(__prompt)
     if anim:
         for i in str(__prompt):
-            print(colored(i, color), end="", flush=True)
+            print(colored(i, color), end="", flush=flush)
             time.sleep(times)
     else:
-        print(colored(str(__prompt), color), end="")
+        print(colored(str(__prompt), color), end="", flush=flush)
     returned = input()
     if logs:
         write_logs(returned)
@@ -324,11 +327,11 @@ def write_logs(*values: object,
     if not os.path.exists("latest"):
         os.mkdir("latest")
     with open(os.path.join("latest", f"{datetime.today().date()}.log"), "a", encoding="UTF-8") as file:
-        file.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}")
+        file.write(f"{datetime.now().strftime('%m:%d:%Y-%H:%M:%S')} {text}")
 
 
 def colored(text: str, 
-            color: tuple | str | None = None
+            color: tuple | str = None
             ) -> str:
     """
     This method allows you to convert non-colored text to colored text. The color argument supports 
