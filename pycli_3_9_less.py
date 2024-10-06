@@ -189,7 +189,8 @@ class CLI:
                 if lnal > lna: lna = lnal
                 lal = len(", ".join(self.__cmd[i]["alias"]))
                 if lal > la: la = lal
-        for i in cmds.sort():
+        cmds = sorted(cmds)
+        for i in cmds:
             alias = ", ".join(self.__cmd[i]["alias"])
             alias += (la-len(alias))*" "
             args = " ".join(map(str, self.__cmd[i]["args"]))
@@ -199,7 +200,7 @@ class CLI:
 
     def change_directory(self, path : str = home) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = os.apath.join(self.path, path)
+        npath = os.path.join(self.path, path)
         if os.path.isdir(npath):
             path = os.path.normpath(npath)
         else:
@@ -259,6 +260,7 @@ def echo(*values: object,
     writes the text you enter to the daily logs which is by default enabled. The cool parameter corresponds
     to the exposure time before displaying the next character (in MS) of the text you have entered if the 
     anim parameter is set to True.
+    If the anim argument is set to True, the arguments flush will be set to True.
 
 
     Example of use::
@@ -271,12 +273,11 @@ def echo(*values: object,
         times =  cool / len(output)
     if anim:
         for char in output:
-            print(colored(char, color), end="", flush=flush, file=file)
+            print(colored(char, color), end="", flush=True, file=file)
             time.sleep(times)
         print(end=end)
     else:
         print(colored(output, color), end=end, flush=flush, file=file)
-
     if logs:
         write_logs(output)
 
