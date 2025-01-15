@@ -35,13 +35,13 @@ PyCLI is a command-line utility that provides a powerful framework for creating 
 import pycli
 Create a new CLI instance
 cli = pycli.CLI(
-prompt="[{}]@[{}]\\>", # Customizable prompt
-user="MyApp", # Username in prompt
-title="My CLI App", # Window title
-logs=True, # Enable logging
-anim=True, # Enable text animation
-cool=0.1, # Animation speed
-color=(255,0,0) # Text color (RGB)
+    prompt="[{}]@[{}]\\>", # Customizable prompt
+    user="MyApp", # Username in prompt
+    title="My CLI App", # Window title
+    logs=True, # Enable logging
+    anim=True, # Enable text animation
+    cool=0.1, # Animation speed
+    color=(255,0,0) # Text color (RGB)
 )
 ```
 
@@ -50,6 +50,6 @@ color=(255,0,0) # Text color (RGB)
 ```python
 @cli.command()
 def hello(name: str = "World"):
-"""Says hello to someone"""
+    """Says hello to someone"""
     pycli.echo(f"Hello {name}!")
 ```
