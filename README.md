@@ -42,7 +42,8 @@ logs=True, # Enable logging
 anim=True, # Enable text animation
 cool=0.1, # Animation speed
 color=(255,0,0) # Text color (RGB)
-)```
+)
+```
 
 ###Create a simple command
 
