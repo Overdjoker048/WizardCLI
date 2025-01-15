@@ -45,7 +45,7 @@ color=(255,0,0) # Text color (RGB)
 )
 ```
 
-###Create a simple command
+##Create a simple command
 
 ```python
 @cli.command()
