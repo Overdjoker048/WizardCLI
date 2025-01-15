@@ -44,7 +44,7 @@ pip install -r requirements.txt
 ## Example Usage
 ```python
 import pycli
-Create a new CLI instance
+#Create a new CLI instance
 cli = pycli.CLI(
     prompt="[{}]@[{}]\\>", # Customizable prompt
     user="MyApp", # Username in prompt
