@@ -30,17 +30,6 @@ PyCLI is a command-line utility that provides a powerful framework for creating 
 - **Visual Feedback**: Progress indicators and loading animations
 - **Development Tools**: Memory tracking and execution time measurement
 
-## SetupAndInstallation
-1. Clone the repository:
-``` bash
-git clone https://github.com/Overdjoker048/PyCLI.git
-cd PyCLI
-```
-2. Install the required dependencies:
-``` bash
-pip install -r requirements.txt
-```
-
 ## Example Usage
 ```python
 import pycli
