@@ -426,11 +426,10 @@ def colored(text: str,
         >>> print(pycli.colored("Hello World", "FF0000"))
         >>> print(pycli.colored("Hello World", (255, 0, 0)))
     """
-    if color is None:
-        return text
-    else:
+    if color:
         color = __to_rgb(color)
         return "\033[38;2;{};{};{}m{}\033[0m".format(int(color[0]), int(color[1]), int(color[2]), text)
+    return text
 
 
 def gradiant(
@@ -662,9 +661,6 @@ class strloading:
     def __init__(self) -> str:
         """Creates a rotating loading animation with characters | / - \
 
-        Args:
-            reset (bool, optional): Reset the animation to initial state. Defaults to False.
-
         Returns:
             str: One of the characters in the sequence | / - \
 
@@ -677,20 +673,26 @@ class strloading:
             # Output will show: | → / → - → \ → |
         """
         self.__cached = 0
+        self.__running = True
 
     def next(self) -> str:
         self.__cached = (self.__cached + 1) % 4
         return ["|", "/", "-", "\\"][self.__cached]
 
+    def __iter__(self):
+        return self
+
     def __next__(self) -> str:
-        return self.next()
+        if self.__running:
+            return self.next()
+        raise StopIteration
+
+    def stop(self, condition: bool = False) -> None:
+        self.__running = condition
 
 class strwait:
     def __init__(self) -> str:
         """Creates a "dots" waiting animation (. .. ...)
-
-        Args:
-            reset (bool, optional): Reset the animation to initial state. Defaults to False.
 
         Returns:
             str: String containing 1-3 dots, right-padded with spaces to maintain width
@@ -704,6 +706,7 @@ class strwait:
             # Output will show: Loading. → Loading.. → Loading...
         """
         self.__points = 1
+        self.__running = True
 
     def next(self) -> str:
         if self.__points > 2:
@@ -712,8 +715,16 @@ class strwait:
             self.__points = (self.__points % 3) + 1
         return "." * self.__points + " " * (3 - self.__points)
 
+    def __iter__(self):
+        return self
+
     def __next__(self) -> str:
-        return self.next()
+        if self.__running:
+            return self.next()
+        raise StopIteration
+
+    def stop(self, condition: bool = False) -> None:
+        self.__running = condition
 
 def strpercent(value: float, total: float, size: int = 10, char: str = "█") -> str:
     """Creates a progress bar visualization
