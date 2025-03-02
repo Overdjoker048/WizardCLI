@@ -4,16 +4,15 @@ Python Command Line Interface
 
 Basic librairy for create CLI in Python.
 
-:copyright: Copyright (c) 2023-2024 Overdjoker048
+:copyright: Copyright (c) 2023-2025 Overdjoker048
 :license: MIT, see LICENSE for more details.
 
 Create basic Python CLI:
-
     >>> import pycli
     >>> cli = pycli.CLI()
     >>> @cli.command()
     >>> def hello_world():
-    >>>     print("Hello World")
+    ...     print("Hello World")
     >>> cli.run()
 """
 
@@ -21,25 +20,32 @@ __encoding__ = "UTF-8"
 __title__ = 'pycli'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
-__copyright__ = 'Copyright (c) 2023-2024 Overdjoker048'
-__version__ = '1.3.0'
-__all__ = ['CLI', 'echo', 'prompt', 'write_logs', 'colored', 'gradiant', 'gram', 'exectime', 'file', 'optional']
+__copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
+__version__ = '1.3.1'
+__all__ = [
+    'CLI', 'echo', 'prompt', 'writelog',
+    'colored', 'gradiant', 'gram', 'exectime',
+    'File', 'optional', 'Strwait', 'Strloading',
+    'strpercent', 'bold', 'italics', 'underline'
+    'reverse', 'rod', 'EscapeSequence'
+]
 
-import colorama
-import inspect
-import datetime
-import os
-import time
-import sys
-import shlex
-import functools
-import typing
+from datetime import datetime
+from os import path, name, system, kill, getpid, stat, mkdir
+from typing import Union, Callable as Tcallable, Tuple
+from time import sleep, perf_counter
+from colorama import init
+from inspect import Signature, signature, stack
+from shlex import split as splitS
+from functools import wraps
 from pympler import asizeof
+from threading import Thread
+from re import compile
 
-colorama.init()
+init()
 
 class CLI:
-    home = os.path.dirname(__file__)
+    home = path.dirname(__file__)
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
@@ -47,11 +53,11 @@ class CLI:
                  logs: bool = True,
                  anim: bool = True,
                  cool: float = 0.1,
-                 color: typing.Union[tuple, str] = None
+                 color: Union[tuple, str] = None
                  ) -> None:
         """This object allows the creation of the CLI.
 
-        Args:
+        Arguments:
             prompt (str): Text displayed in terminal when entering commands. Defaults to "[{}]@[{}]\\>".
             user (str): Username displayed in prompt. Defaults to "Python-Cli".
             title (str, optional): Window title. Defaults to None.
@@ -60,19 +66,16 @@ class CLI:
             cool (float): Delay between characters for animation. Defaults to 0.1.
             color (Union[tuple, str], optional): Text color in RGB or hex. Defaults to None.
 
-        Returns:
-            None
-
         Example of use:
             >>> import pycli
             >>> cli = pycli.CLI()
             >>> @cli.command()
             >>> def hello_world():
-            >>>     print("Hello World")
+            ...    print("Hello World")
             >>> cli.run()
         """
         if title is not None:
-            os.system("title {}".format(title) if os.name == 'nt' else "echo -n '\033]0;{}\007'".format(title))
+            system("title {}".format(title) if name == 'nt' else "echo -n '\033]0;{}\007'".format(title))
 
         self.__cmd = {}
         self.prompt = prompt
@@ -82,11 +85,10 @@ class CLI:
         self.anim = anim
         self.cool = cool
         self.color = color
-        self.__clear_cmd = "cls" if os.name == 'nt' else "clear"
+        self.__clear_cmd = "cls" if name == 'nt' else "clear"
         self.command(alias=["?"], doc=self.help.__doc__)(self.help)
         self.command(alias=[self.__clear_cmd], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
         self.command(alias=["exit"], doc=self.leave.__doc__)(self.leave)
-
         @self.command(alias=["cd"], doc=self.change_directory.__doc__)
         @optional(CLI.home)
         def change_directory(path) -> None:
@@ -96,15 +98,15 @@ class CLI:
                 name: str = None,
                 doc: str = None,
                 alias : list = []
-                ) -> typing.Callable:
+                ) -> Tcallable:
         """The command decorator allows you to define a function as a command for the CLI.
 
-        Args:
+        Arguments:
             name (str, optional): Name of the command. Defaults to function name.
             doc (str, optional): Documentation for the command. Defaults to function docstring.
             alias (list): List of alternative names for the command. Defaults to [].
 
-        Returns:
+        Return:
             Callable: Decorated function that becomes a CLI command.
 
         Example of use:
@@ -112,18 +114,18 @@ class CLI:
             >>> cli = pycli.CLI()
             >>> @cli.command()
             >>> def hello_world():
-            >>>     print("Hello World")
+            ...    print("Hello World")
             >>> cli.run()
         """
-        def decorator(func: callable) -> typing.Callable:
+        def decorator(func: callable) -> Tcallable:
             def wrapper(name: str, doc: str, alias: list) -> None:
                 if doc is None:
                     doc = ""
                 data = {"function": func}
-                args_info = inspect.signature(func).parameters.items()
+                args_info = signature(func).parameters.items()
                 args, options, params = [], [], {}
                 for arg_name, arg_info in args_info:
-                    if arg_info.default == inspect.Signature.empty:
+                    if arg_info.default == Signature.empty:
                         args.append(("[{}]".format(arg_name), arg_info.annotation))
                     elif arg_info.default is True:
                         options.append("-{}".format(arg_name))
@@ -148,11 +150,11 @@ class CLI:
 
     def leave(self) -> None:
         "Close the terminal."
-        os.kill(os.getpid(), 9)
+        kill(getpid(), 9)
 
     def clear_host(self) -> None:
         "Reset the display of the terminal."
-        os.system(self.__clear_cmd)
+        system(self.__clear_cmd)
 
     def __format(self, name: str, cmd: dict) -> dict:
         "Format data of command."
@@ -185,23 +187,23 @@ class CLI:
         if not m:
             lines = ["{} {}".format(cmd.ljust(max_length), cmds[cmd]['doc']) for cmd in sorted(cmds)]
         text = "\n".join(lines)
-        echo(text, anim=self.anim, cool=self.cool, color=self.color)
+        echo(colored(text, self.color), anim=self.anim, cool=self.cool)
 
     def change_directory(self, path : str) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = os.path.join(self.path, path)
-        if os.path.isdir(npath):
-            path = os.path.normpath(npath)
+        npath = path.join(self.path, path)
+        if path.isdir(npath):
+            path = path.normpath(npath)
         else:
-            path = os.path.normpath(path)
-        if os.path.isdir(path):
+            path = path.normpath(path)
+        if path.isdir(path):
             self.path = str(path).title()
         else:
-            echo("The path is invalid.", anim=self.anim, cool=self.cool, color=self.color)
+            echo(colored("The path is invalid.", self.color), anim=self.anim, cool=self.cool)
 
     def __decode(self, tpe: object, value: any) -> object:
         "Format arguments in the types chosen when creating commands."
-        if tpe is inspect.Signature.empty:
+        if tpe is Signature.empty:
             return value
         elif hasattr(tpe, '__args__'):
             for member in tpe.__args__:
@@ -254,7 +256,7 @@ class CLI:
             if arg.startswith("--"):
                 value = cmd["params"].get(arg)
                 if value is None:
-                    echo("Unknown Parameter", anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                    echo(colored("Unknown Parameter", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
                     do = True
                     break
                 kwargs[arg[2:]] = None if index + 1 >= len(entry) else self.__decode(value[0], entry[index + 1])
@@ -265,10 +267,10 @@ class CLI:
                 else:
                     if arg == "-?":
                         do = True
-                        echo(cmd["info"], anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                        echo(colored(cmd["info"], self.color), anim=self.anim, cool=self.cool, logs=self.logs)
                         break
                     else:
-                        echo("Unknown Option", anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                        echo(colored("Unknown Option", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
                         do = True
                         break
             else:
@@ -276,7 +278,7 @@ class CLI:
                     kwargs[cmd["args"][arg_i][0].strip("[]")] = self.__decode(cmd["args"][arg_i][1], arg)
                     arg_i += 1
                 else:
-                    echo("Too many arguments provided.", anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                    echo(colored("Too many arguments provided.", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
                     do = True
                     break
             index += 1
@@ -286,23 +288,23 @@ class CLI:
     def run(self) -> None:
         "This method of the CLI object allows you to launch the CLI after you have created all your commands."
         if self.logs:
-            write_logs(self.__cmd)
+            writelog(self.__cmd)
         while True:
             try:
-                entry = shlex.split(prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool, color=self.color, logs=self.logs))
+                entry = splitS(prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool, logs=self.logs))
                 if not entry:
                     continue
                 cmd = self.__cmd.get(entry[0].lower())
                 if cmd is None:
-                    echo("{} doesn't exist.\nDo help to get the list of existing commands.".format(entry[0]), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                    echo(colored("{} doesn't exist.\nDo help to get the list of existing commands.".format(entry[0]), self.color), anim=self.anim, cool=self.cool, logs=self.logs)
                     continue
                 if isinstance(cmd, str):
                     cmd = self.__cmd[cmd]
                 self.exec(cmd, entry)
             except KeyboardInterrupt:
-                os.kill(os.getpid(), 9)
+                kill(getpid(), 9)
             except Exception as e:
-                echo("An unexpected error occurred: {}".format(e), anim=self.anim, cool=self.cool, logs=self.logs, color=self.color)
+                echo(colored("An unexpected error occurred: {}".format(e), self.color), anim=self.anim, cool=self.cool, logs=self.logs)
 
 
 def echo(*values: object,
@@ -310,26 +312,21 @@ def echo(*values: object,
          end: str = "\n",
          anim: bool = True,
          cool: float = 0.1,
-         color: typing.Union[tuple, str] = None,
          logs: bool = False,
          flush: bool = False,
          file: None = None,
          ) -> None:
     """Print message with animation and logging capabilities.
 
-    Args:
+    Arguments:
         values (object): Values to print.
         sep (str): Separator between values. Defaults to " ".
         end (str): String appended after the last value. Defaults to "\\n".
         anim (bool): Enable/disable progressive display. Defaults to True.
         cool (float): Delay between characters for animation. Defaults to 0.1.
-        color (Union[tuple, str], optional): Text color in RGB or hex. Defaults to None.
         logs (bool): Enable/disable logging. Defaults to False.
         flush (bool): Force flush the output. Defaults to False.
         file (TextIO, optional): File-like object to write to. Defaults to None.
-
-    Returns:
-        None
 
     Example of use:
         >>> import pycli
@@ -339,70 +336,83 @@ def echo(*values: object,
     if len(output) != 0:
         times =  cool / len(output)
     if anim:
-        for char in output:
-            print(colored(char, color), end="", flush=True, file=file)
-            time.sleep(times)
+        for char in EscapeSequence(output):
+            print(char, end="", flush=True, file=file)
+            sleep(times)
         print(end=end)
     else:
-        print(colored(output, color), end=end, flush=flush, file=file)
+        print(output, end=end, flush=flush, file=file)
     if logs:
-        write_logs(output)
+        writelog(output)
 
 
 def prompt(__prompt: object = "",
            anim: bool = True,
            cool: float = 0.1,
-           color: typing.Union[tuple, str] = None,
+           color: Union[tuple, str] = None,
            logs: bool = False,
            flush: bool = False
            ) -> str:
-    """
-    The prompt method works like the input method which is already implemented in python but has a progressive display 
-    system if the value of the anim parameter is set to True and also includes a logging system that writes the 
-    text that the user will respond to in the daily logs. The logging system is enabled by default. The cool 
+    """The prompt method works like the input method which is already implemented in Python but has a progressive display
+    system if the value of the anim parameter is set to True and also includes a logging system that writes the
+    text that the user will respond to in the daily logs. The logging system is enabled by default. The cool
     parameter corresponds to the exposure time before displaying the next character (in MS) of the text you have entered
     if the anim parameter is set to True.
 
-    Example of use::
+    Arguments:
+        __prompt (object): The prompt text to display.
+        anim (bool): Enable/disable progressive display. Defaults to True.
+        cool (float): Delay between characters for animation. Defaults to 0.1.
+        color (Union[tuple, str], optional): Text color in RGB or hex. Defaults to None.
+        logs (bool): Enable/disable logging. Defaults to False.
+        flush (bool): Force flush the output. Defaults to False.
 
+    Return:
+        str: The user's input.
+
+    Example of use:
         >>> import pycli
-        >>> pycli.prompt("What's your name ?", anim=True, cool=15, logs=True, end="\n", sep=" ")
+        >>> pycli.prompt("What's your name?", anim=True, cool=15, logs=True)
     """
+    __prompt = EscapeSequence(__prompt)
     if len(__prompt) != 0:
         times =  cool / len(__prompt)
     if anim:
-        for i in str(__prompt):
-            print(colored(i, color), end="", flush=flush)
-            time.sleep(times)
+        for i in __prompt:
+            print(i, color, end="", flush=flush)
+            sleep(times)
     else:
-        print(colored(str(__prompt), color), end="", flush=flush)
+        print(__prompt, end="", flush=flush)
     returned = input()
     if logs:
-        write_logs(returned)
+        writelog(returned)
     return returned
 
 
-def write_logs(*values: object,
+def writelog(*values: object,
                sep: str = " ",
                end: str = "\n",
                ) -> None:
-    """
-    The write_logs method allows to write in the daily logs. This method works like the print method which is already 
-    implemented in python for the sep and end parameters.
+    """The writelog method allows writing in the daily logs. This method works like the print method which is already 
+    implemented in Python for the sep and end parameters.
+
+    Arguments:
+        values (object): Values to write to the log.
+        sep (str): Separator between values. Defaults to " ".
+        end (str): String appended after the last value. Defaults to "\\n".
 
     Example of use:
-
         >>> import pycli
-        >>> pycli.write_logs("CLI was starting.")
+        >>> pycli.writelog("CLI was starting.")
     """
     text = sep.join(map(str, values)) + end
-    if not os.path.exists("latest"):
-        os.mkdir("latest")
-    with open(os.path.join("latest", "{}.log".format(datetime.datetime.today().date())), "a", encoding="UTF-8") as file:
-        file.write("{} {}".format(datetime.datetime.now().strftime('%H:%M:%S'), text))
+    if not path.exists("latest"):
+        mkdir("latest")
+    with open(path.join("latest", "{}.log".format(datetime.today().date())), "a", encoding="UTF-8") as file:
+        file.write("{} {}".format(datetime.now().strftime('%H:%M:%S'), text))
 
 
-def __to_rgb(color: typing.Union[tuple, str] = None) -> tuple:
+def __to_rgb(color: Union[tuple, str] = None) -> tuple:
     "Format le code couleur entré vers un code RGB."
     if isinstance(color, str):
         return tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
@@ -410,43 +420,44 @@ def __to_rgb(color: typing.Union[tuple, str] = None) -> tuple:
 
 
 def colored(text: str,
-            color: typing.Union[tuple, str, list] = None
+            color: Union[tuple, str, list] = None
             ) -> str:
     """Convert text to colored text using ANSI escape codes.
 
-    Args:
+    Arguments:
         text (str): Text to be colored.
         color (Union[tuple, str, list], optional): Color in RGB tuple or hex string format. Defaults to None.
 
-    Returns:
+    Return:
         str: ANSI colored text string.
 
-    Examples of use:
+    Example of use:
         >>> import pycli
         >>> print(pycli.colored("Hello World", "FF0000"))
         >>> print(pycli.colored("Hello World", (255, 0, 0)))
     """
-    if color:
+    if color is None:
+        return text
+    else:
         color = __to_rgb(color)
         return "\033[38;2;{};{};{}m{}\033[0m".format(int(color[0]), int(color[1]), int(color[2]), text)
-    return text
 
 
 def gradiant(
     text: str,
-    start: typing.Union[tuple, str],
-    end: typing.Union[tuple, str],
+    start: Union[tuple, str],
+    end: Union[tuple, str],
     sep: str = ""
     ) -> str:
     """Create text with color gradient effect.
 
-    Args:
+    Arguments:
         text (str): Text to apply gradient to.
         start (Union[tuple, str]): Starting color in RGB tuple or hex format.
         end (Union[tuple, str]): Ending color in RGB tuple or hex format.
         sep (str, optional): Separator for splitting text into segments. Defaults to "".
 
-    Returns:
+    Return:
         str: Text with color gradient applied.
 
     Example of use:
@@ -471,63 +482,50 @@ def gradiant(
     return txt
 
 
-def gram(debug=False) -> None:
+def gram() -> Tuple[dict, int]:
     """Display memory usage of the program.
 
-    Args:
-        debug (bool, optional): Show detailed memory usage per variable. Defaults to False.
-
-    Returns:
-        None
+    Return:
+        tuple: A tuple containing:
+            - dict: A dictionary with variable names as keys and a tuple of (type, size in bytes) as values.
+            - int: The total memory usage in bytes.
 
     Example of use:
         >>> import pycli
-        >>> gram(debug=True)
+        >>> total_memory, memory = pycli.gram()
+        >>> print(memory)
+        >>> print("Total memory usage:", total_memory, "bytes")
     """
-    memory = 0
-    frame = inspect.stack()[1][0].f_globals
+    memory = {}
+    gmemory = 0
+    frame = stack()[1][0].f_globals
     for index in frame:
-        imemory = sys.getsizeof(frame[index])
         imemory = asizeof.asizeof(frame[index])
-        if debug:
-            tpe = str(type(frame[index])).replace("<class '", "").replace("'>", "")
-            print("[{}] {}: {} bytes".format(index, tpe, imemory))
-        memory += imemory
-    print("Total: {} bytes".format(memory))
+        memory[index] = (type(frame[index]), imemory)
+        gmemory += imemory
+    return (gmemory, memory)
 
 
-def exectime(func: callable) -> typing.Callable:
+def exectime(func: callable) -> Tcallable:
     """Decorator to measure function execution time.
 
-    Args:
+    Argument:
         func (callable): Function to measure.
 
-    Returns:
+    Return:
         Callable: Wrapped function that prints execution time.
 
     Example of use:
         >>> import pycli
         >>> @pycli.exectime
         >>> def hello_world():
-        >>>     print("Hello World")
+        ...    print("Hello World")
     """
-    @functools.wraps(func)
+    @wraps(func)
     def wrapper(**kwargs) -> any:
-        """
-        Shows the execution time of the associated function.
-
-        Example of use:
-
-            >>> import pycli
-            >>> @pycli.exectime
-            >>> def hello_world():
-            >>>     print("Hello World")
-        """
-        start = time.perf_counter()
+        start = perf_counter()
         result = func(**kwargs)
-        end = time.perf_counter()
-        print("{:.2f} ms".format((end - start) * 1000))
-        return result
+        return "{:.2f} ms".format((perf_counter() - start) * 1000), result
     return wrapper
 
 
@@ -535,18 +533,17 @@ def optional(*defaults):
     """
     Set the value None to arguments that are not entered if the user has not defined a default value in the decorator.
 
-    Examples of use:
-
+    Example of use:
         >>> import pycli
         >>> @pycli.optional("World")
         >>> def hello_world(name):
-        >>>     print("Hello", name)
+        ...     print("Hello", name)
     """
-    def decorator(func: callable) -> typing.Callable:
-        @functools.wraps(func)
+    def decorator(func: callable) -> Tcallable:
+        @wraps(func)
         def wrapper(*args, **kwargs) -> any:
-            for i, (param_name, param) in enumerate(inspect.signature(func).parameters.items()):
-                if param_name not in kwargs or kwargs[param_name] is inspect.Signature.empty:
+            for i, (param_name, param) in enumerate(signature(func).parameters.items()):
+                if param_name not in kwargs or kwargs[param_name] is Signature.empty:
                     if i < len(defaults):
                         kwargs[param_name] = defaults[i]
                     else:
@@ -556,29 +553,28 @@ def optional(*defaults):
     return decorator
 
 
-class file:
+class File:
     def __init__(self, path: str, encoding: str = "UTF-8") -> None:
         """Allows you to manage files from their own type.
 
-        Args:
+        Arguments:
             path (str): The path to the file.
             encoding (str, optional): The encoding of the file. Defaults to "UTF-8".
 
-        Examples of use:
-
-        >>> import pycli
-        >>> file = pycli.file("test.txt", "UTF-8")
+        Example of use:
+            >>> import pycli
+            >>> file = pycli.file("test.txt", "UTF-8")
         """
-        self.name, self.extention = os.path.splitext(path)
+        self.name, self.extention = path.splitext(path)
         self.__encoding = encoding
-        if os.path.exists(self.name+self.extention) and os.path.isfile(path):
+        if path.exists(self.name+self.extention) and path.isfile(path):
             self.__binary = open(path, "rb").read()
         else:
             open(path, "wb").close()
             self.__binary = b""
-        self.__created = os.path.getctime(path) if os.path.exists(path) else None
-        self.__last_modif = os.path.getmtime(path) if os.path.exists(path) else None
-        self.__perm = oct(os.stat(path).st_mode & 0o777) if os.path.exists(path) else None
+        self.__created = path.getctime(path) if path.exists(path) else None
+        self.__last_modif = path.getmtime(path) if path.exists(path) else None
+        self.__perm = oct(stat(path).st_mode & 0o777) if path.exists(path) else None
         self.__lines = self.split()
 
     @property
@@ -622,16 +618,16 @@ class file:
 
     def __eq__(self, other: object) -> bool:
         """Compares two files."""
-        if isinstance(other, file):
+        if isinstance(other, File):
             return self.path == other.path and self.__data == other.__data
         return False
 
-    def __iter__(self) -> typing.Callable:
+    def __iter__(self) -> Tcallable:
         """Returns an iterator for the file."""
         self.index = 0
         return self
 
-    def __next__(self) -> typing.Union[str, StopIteration]:
+    def __next__(self) -> Union[str, StopIteration]:
         """Returns the next line in the file."""
         if self.index < len(self.__lines):
             line = self.__lines[self.index]
@@ -640,105 +636,90 @@ class file:
         else:
             raise StopIteration
 
-    def append(self, data: typing.Union[str, bytes]) -> None:
+    def append(self, data: Union[str, bytes]) -> None:
         """Appends data to the file."""
+        Thread(target=self.__write, args=(data)).start()
+
+    def __write(self, data: Union[str, bytes]) -> None:
+        """Writes data to the file."""
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
             raise ValueError("data must be bytes or str")
         self.__binary += data
-
-    def save(self) -> None:
-        """Saves the file."""
         open(self.name + self.extention, "wb").write(self.__binary)
 
     def __add__(self, value: object) -> None:
         """Adds data to the file."""
-        self.append(str(value))
+        Thread(target=self.__write, args=(str(value))).start()
         return self
 
-class strloading:
-    def __init__(self) -> str:
-        """Creates a rotating loading animation with characters | / - \
 
-        Returns:
-            str: One of the characters in the sequence | / - \
+class Strloading:
+    def __init__(self, cool: float = 0.1) -> None:
+        """
+        Creates a rotating loading animation with characters | / - \\
 
-        Example:
+        Return:
+            str: One of the characters in the sequence | / - \\
+
+        Example of use:
             >>> import pycli
-            >>> from time import sleep
-            >>> for _ in range(4):
-            ...     print(pycli.strloading(), end='\r')
-            ...     sleep(0.25)
-            # Output will show: | → / → - → \ → |
+            >>> anim = pycli.strloading(cool=0.1)
+            >>> for _ in range(5):
+            ...     anim.print()
+            # Output will show: | → / → - → \\ → |
         """
         self.__cached = 0
-        self.__running = True
+        self.cool = cool
+        self.__strcache = "|"
 
-    def next(self) -> str:
+    def print(self) -> None:
+        "Displays the current animation character."
+        print(self.__strcache, end="\r", flush=True)
         self.__cached = (self.__cached + 1) % 4
-        return ["|", "/", "-", "\\"][self.__cached]
+        self.__strcache = ["|", "/", "-", "\\"][self.__cached]
 
-    def __iter__(self):
-        return self
 
-    def __next__(self) -> str:
-        if self.__running:
-            return self.next()
-        raise StopIteration
+class Strwait:
+    def __init__(self, cool: float = 1.0) -> None:
+        """
+        Creates a "dots" waiting animation (. .. ...)
 
-    def stop(self, condition: bool = False) -> None:
-        self.__running = condition
-
-class strwait:
-    def __init__(self) -> str:
-        """Creates a "dots" waiting animation (. .. ...)
-
-        Returns:
+        Return:
             str: String containing 1-3 dots, right-padded with spaces to maintain width
 
-        Example:
+        Example of use:
             >>> import pycli
-            >>> from time import sleep
+            >>> anim = pycli.strwait(cool=0.5)
             >>> for _ in range(3):
-            ...     print(f"Loading{pycli.strwait()}", end='\r')
-            ...     sleep(0.5)
+            ...     anim.print()
             # Output will show: Loading. → Loading.. → Loading...
         """
+        self.cool = cool
         self.__points = 1
-        self.__running = True
+        self.__strcache = "."
 
-    def next(self) -> str:
-        if self.__points > 2:
-            self.__points = 1
-        else:
-            self.__points = (self.__points % 3) + 1
-        return "." * self.__points + " " * (3 - self.__points)
+    def print(self) -> None:
+        "Displays the current string of dots."
+        print(self.__strcache, end="\r", flush=True)
+        self.__points = (self.__points % 3) + 1
+        self.__strcache = "." * self.__points + " " * (3 - self.__points)
 
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> str:
-        if self.__running:
-            return self.next()
-        raise StopIteration
-
-    def stop(self, condition: bool = False) -> None:
-        self.__running = condition
 
 def strpercent(value: float, total: float, size: int = 10, char: str = "█") -> str:
     """Creates a progress bar visualization
 
-    Args:
+    Arguments:
         value (float): Current progress value
         total (float): Maximum progress value
         size (int, optional): Width of the progress bar in characters. Defaults to 10.
         char (str, optional): Character to use for filled portion. Defaults to "█".
 
-    Returns:
+    Return:
         str: A progress bar string like "██████    " representing the progress
 
-    Example:
+    Examples of use:
         >>> import pycli
         >>> print(pycli.strpercent(7, 10, size=10))
         # Output: "███████   "
@@ -748,3 +729,131 @@ def strpercent(value: float, total: float, size: int = 10, char: str = "█") ->
     assert total >= value > 0 and size > 0
     percent = int((value / total) * size)
     return "{}{}".format(percent*char, (size-percent)*" ")
+
+
+def bold(value: str) -> str:
+    """
+    Applies bold effect to the given text.
+
+    Argument:
+        value (str): The text to format.
+
+    Return:
+        str: The text formatted in bold.
+
+    Example of use:
+        >>> import pycli
+        >>> print(pycli.bold("Bold text"))
+    """
+    return "\033[1m{}\033[0m".format(value)
+
+
+def italics(value: str) -> str:
+    """
+    Applies italics effect to the given text.
+
+    Argument:
+        value (str): The text to format.
+
+    Return:
+        str: The text formatted in italics.
+
+    Example of use:
+        >>> import pycli
+        >>> print(pycli.italics("Italic text"))
+    """
+    return "\033[3m{}\033[0m".format(value)
+
+
+def underline(value: str) -> str:
+    """
+    Applies underline effect to the given text.
+
+    Argument:
+        value (str): The text to format.
+
+    Return:
+        str: The text formatted with underline.
+
+    Example of use:
+        >>> import pycli
+        >>> print(pycli.underline("Underlined text"))
+    """
+    return "\033[4m{}\033[0m".format(value)
+
+
+def reverse(value: str) -> str:
+    """
+    Applies reverse color effect to the given text.
+
+    Argument:
+        value (str): The text to format.
+
+    Return:
+        str: The text formatted with reverse colors.
+
+    Example of use:
+        >>> import pycli
+        >>> print(pycli.reverse("Text with reverse colors"))
+    """
+    return "\033[7m{}\033[0m".format(value)
+
+
+def rod(value: str) -> str:
+    """
+    Applies strikethrough effect to the given text.
+
+    Argument:
+        value (str): The text to format.
+
+    Return:
+        str: The text formatted with strikethrough.
+
+    Example of use:
+        >>> import pycli
+        >>> print(pycli.rod("Strikethrough text"))
+    """
+    return "\033[9m{}\033[0m".format(value)
+
+
+class EscapeSequence(str):
+    ANSI_ESCAPE_PATTERN = compile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
+    def __init__(self, value: str = "") -> None:
+        """A class to handle and iterate over ANSI escape sequences in strings..
+
+        Argument:
+            value (str): The string value to initialize the EscapeSequence object with. Defaults to an empty string.
+
+        Example of use:
+            >>> import pycli
+            >>> esc_seq = pycli.EscapeSequence("\033[31mHello\033[0m")
+        """
+        super().__init__()
+        self.value = value
+
+    def __repr__(self) -> str:
+        """Returns a string representation of the EscapeSequence object."""
+        return "EscapeSequence(value='{}')".format(self.value)
+
+    def __iter__(self) -> Tcallable:
+        """Returns an iterator for the EscapeSequence object."""
+        self.index = 0
+        return self
+
+    def nextchar(self) -> str:
+        """Returns the next character or escape sequence in the string."""
+        match = self.ANSI_ESCAPE_PATTERN.match(self.value, self.index)
+        if match:
+            seq = match.group()
+            self.index = match.end()
+            if self.index < len(self.value):
+                return seq + self.nextchar()
+            return seq
+        self.index += 1
+        return self.value[self.index - 1]
+
+    def __next__(self) -> str:
+        """Returns the next character or escape sequence in the string, raises StopIteration when done."""
+        if self.index >= len(self.value):
+            raise StopIteration
+        return self.nextchar()
