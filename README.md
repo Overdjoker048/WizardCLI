@@ -5,7 +5,7 @@ A simple and efficient command-line tool written in Python.
 ## Python Compatibility
 
 - Minimum required version: Python 3.7
-- Maximum tested version: Python 3.13
+- Maximum tested version: Python 3.12
 
 ## Description
 
@@ -98,7 +98,7 @@ def hello_world():
 
 #### File Operations
 ```python
-file = WizzardCLI.File("test.txt")
-file += "Some data"
+file = WizzardCLI.File("test.txt", "UTF-8")
+file.append("Some data")
 print(file)
 ```
