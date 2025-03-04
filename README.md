@@ -5,11 +5,6 @@
 
 A simple and efficient command-line tool written in Python.
 
-## Python Compatibility
-
-- Minimum required version: Python 3.7
-- Maximum tested version: Python 3.12
-
 ## Description
 
 WizzardCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
@@ -58,50 +53,4 @@ def hello(name: str = "World"):
 
 # Run the CLI
 cli.run()
-```
-
-### Additional Features
-
-#### Colored Text
-```python
-print(WizzardCLI.colored("Hello World", "FF0000")) # Hex color
-print(WizzardCLI.colored("Hello World", (255, 0, 0))) # RGB color
-```
-
-#### Gradient Text
-```python
-print(WizzardCLI.gradiant("Hello World", (255,0,0), (0,0,255)))
-```
-
-#### Loading Animations
-```python
-anim = WizzardCLI.Strloading(cool=0.1)
-for _ in range(5):
-    anim.print()
-```
-
-#### Progress Bar
-```python
-print(WizzardCLI.strpercent(7, 10, size=10))
-```
-
-#### Memory Usage
-```python
-total_memory, memory = WizzardCLI.gram()
-print(memory)
-print("Total memory usage:", total_memory, "bytes")
-```
-
-#### Execution Time
-```python
-@WizzardCLI.exectime
-def hello_world():
-    print("Hello World")
-```
-
-#### File Operations
-```python
-file = WizzardCLI.File("test.txt", "UTF-8")
-file.append("Some data")
-print(file)
 ```
