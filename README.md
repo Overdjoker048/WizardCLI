@@ -1,4 +1,4 @@
-# WizzardCLI
+# WizardCLI
 ![Python Version](https://img.shields.io/badge/Python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Version](https://img.shields.io/badge/Version-1.3.1-yellow)
@@ -7,7 +7,7 @@ A simple and efficient command-line tool written in Python.
 
 ## Description
 
-WizzardCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
+WizardCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
 
 - Progressive text display with customizable animation speed
 - Colored text output support (RGB and HEX)
@@ -32,10 +32,10 @@ WizzardCLI is a command-line utility that provides a powerful framework for crea
 
 ## Example Usage
 ```python
-import WizzardCLI
+import WizardCLI
 
 # Create a new CLI instance
-cli = WizzardCLI.CLI(
+cli = WizardCLI.CLI(
     prompt="[{}]@[{}]\\>", # Customizable prompt
     user="MyApp", # Username in prompt
     title="My CLI App", # Window title
@@ -49,7 +49,7 @@ cli = WizzardCLI.CLI(
 @cli.command()
 def hello(name: str = "World"):
     """Says hello to someone"""
-    WizzardCLI.echo(f"Hello {name}!")
+    WizardCLI.echo(f"Hello {name}!")
 
 # Run the CLI
 cli.run()
