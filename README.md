@@ -98,7 +98,7 @@ def hello_world():
 
 #### File Operations
 ```python
-file = WizzardCLI.File("test.txt", "UTF-8")
-file.append("Some data")
+file = WizzardCLI.File("test.txt")
+file += "Some data"
 print(file)
 ```
