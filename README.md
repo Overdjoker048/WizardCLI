@@ -1,4 +1,4 @@
-# PyCLI
+# WizzardCLI
 
 A simple and efficient command-line tool written in Python.
 
@@ -9,7 +9,7 @@ A simple and efficient command-line tool written in Python.
 
 ## Description
 
-PyCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
+WizzardCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
 
 - Progressive text display with customizable animation speed
 - Colored text output support (RGB and HEX)
@@ -29,12 +29,15 @@ PyCLI is a command-line utility that provides a powerful framework for creating 
 - **File Operations**: Integrated file handling with encoding support
 - **Visual Feedback**: Progress indicators and loading animations
 - **Development Tools**: Memory tracking and execution time measurement
+- **Text Effects**: Bold, italics, underline, reverse, and strikethrough text effects
+- **Escape Sequences**: Handling and iterating over ANSI escape sequences
 
 ## Example Usage
 ```python
-import pycli
-#Create a new CLI instance
-cli = pycli.CLI(
+import WizzardCLI
+
+# Create a new CLI instance
+cli = WizzardCLI.CLI(
     prompt="[{}]@[{}]\\>", # Customizable prompt
     user="MyApp", # Username in prompt
     title="My CLI App", # Window title
@@ -43,13 +46,59 @@ cli = pycli.CLI(
     cool=0.1, # Animation speed
     color=(255,0,0) # Text color (RGB)
 )
-```
 
-### Create a simple command
-
-```python
+# Create a simple command
 @cli.command()
 def hello(name: str = "World"):
     """Says hello to someone"""
-    pycli.echo(f"Hello {name}!")
+    WizzardCLI.echo(f"Hello {name}!")
+
+# Run the CLI
+cli.run()
+```
+
+### Additional Features
+
+#### Colored Text
+```python
+print(WizzardCLI.colored("Hello World", "FF0000")) # Hex color
+print(WizzardCLI.colored("Hello World", (255, 0, 0))) # RGB color
+```
+
+#### Gradient Text
+```python
+print(WizzardCLI.gradiant("Hello World", (255,0,0), (0,0,255)))
+```
+
+#### Loading Animations
+```python
+anim = WizzardCLI.Strloading(cool=0.1)
+for _ in range(5):
+    anim.print()
+```
+
+#### Progress Bar
+```python
+print(WizzardCLI.strpercent(7, 10, size=10))
+```
+
+#### Memory Usage
+```python
+total_memory, memory = WizzardCLI.gram()
+print(memory)
+print("Total memory usage:", total_memory, "bytes")
+```
+
+#### Execution Time
+```python
+@WizzardCLI.exectime
+def hello_world():
+    print("Hello World")
+```
+
+#### File Operations
+```python
+file = WizzardCLI.File("test.txt", "UTF-8")
+file.append("Some data")
+print(file)
 ```
