@@ -1,7 +1,7 @@
 # WizzardCLI
 ![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-active-success.svg)
+![version](https://img.shields.io/badge/1.3.1.svg)
 
 A simple and efficient command-line tool written in Python.
 
