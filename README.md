@@ -5,7 +5,7 @@ A simple and efficient command-line tool written in Python.
 ## Python Compatibility
 
 - Minimum required version: Python 3.7
-- Maximum tested version: Python 3.12
+- Maximum tested version: Python 3.13
 
 ## Description
 
