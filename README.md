@@ -1,4 +1,4 @@
-#WizardCLI
+# WizardCLI
 ![Python Version](https://img.shields.io/badge/Python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Version](https://img.shields.io/badge/Version-1.3.1-yellow)
