@@ -21,7 +21,7 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 __all__ = [
     'CLI', 'echo', 'prompt', 'writelog',
     'colored', 'gradiant', 'gram', 'exectime',
@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 from datetime import datetime
-from os import path, name, system, kill, getpid, stat, mkdir
+from os import path as ospath, name, system, kill, getpid, stat, mkdir, rename
 from typing import Union, Callable as Tcallable, Tuple
 from time import sleep, perf_counter
 from colorama import init
@@ -40,12 +40,13 @@ from shlex import split as splitS
 from functools import wraps
 from pympler import asizeof
 from threading import Thread
-from re import compile
+from re import compile as recompile
+from shutil import move
 
 init()
 
 class CLI:
-    home = path.dirname(__file__)
+    home = ospath.dirname(__file__)
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
@@ -191,12 +192,12 @@ class CLI:
 
     def change_directory(self, path : str) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = path.join(self.path, path)
-        if path.isdir(npath):
-            path = path.normpath(npath)
+        npath = ospath.join(self.path, path)
+        if ospath.isdir(npath):
+            path = ospath.normpath(npath)
         else:
-            path = path.normpath(path)
-        if path.isdir(path):
+            path = ospath.normpath(path)
+        if ospath.isdir(path):
             self.path = str(path).title()
         else:
             echo(colored("The path is invalid.", self.color), anim=self.anim, cool=self.cool)
@@ -349,7 +350,6 @@ def echo(*values: object,
 def prompt(__prompt: object = "",
            anim: bool = True,
            cool: float = 0.1,
-           color: Union[tuple, str] = None,
            logs: bool = False,
            flush: bool = False
            ) -> str:
@@ -363,7 +363,6 @@ def prompt(__prompt: object = "",
         __prompt (object): The prompt text to display.
         anim (bool): Enable/disable progressive display. Defaults to True.
         cool (float): Delay between characters for animation. Defaults to 0.1.
-        color (Union[tuple, str], optional): Text color in RGB or hex. Defaults to None.
         logs (bool): Enable/disable logging. Defaults to False.
         flush (bool): Force flush the output. Defaults to False.
 
@@ -379,7 +378,7 @@ def prompt(__prompt: object = "",
         times =  cool / len(__prompt)
     if anim:
         for i in __prompt:
-            print(i, color, end="", flush=flush)
+            print(i, end="", flush=flush)
             sleep(times)
     else:
         print(__prompt, end="", flush=flush)
@@ -406,9 +405,9 @@ def writelog(*values: object,
         >>> WizardCLI.writelog("CLI was starting.")
     """
     text = sep.join(map(str, values)) + end
-    if not path.exists("latest"):
+    if not ospath.exists("latest"):
         mkdir("latest")
-    with open(path.join("latest", "{}.log".format(datetime.today().date())), "a", encoding="UTF-8") as file:
+    with open(ospath.join("latest", "{}.log".format(datetime.today().date())), "a", encoding="UTF-8") as file:
         file.write("{} {}".format(datetime.now().strftime('%H:%M:%S'), text))
 
 
@@ -565,17 +564,20 @@ class File:
             >>> import WizardCLIrdCLI
             >>> file = WizardCLI.file("test.txt", "UTF-8")F-8")
         """
-        self.name, self.extention = path.splitext(path)
+        self.name, self.extention = ospath.splitext(ospath.basename(path))
+        self.path = ospath.dirname(path)
         self.__encoding = encoding
-        if path.exists(self.name+self.extention) and path.isfile(path):
+        if ospath.exists(self.name+self.extention) and ospath.isfile(path):
             self.__binary = open(path, "rb").read()
         else:
             open(path, "wb").close()
             self.__binary = b""
-        self.__created = path.getctime(path) if path.exists(path) else None
-        self.__last_modif = path.getmtime(path) if path.exists(path) else None
-        self.__perm = oct(stat(path).st_mode & 0o777) if path.exists(path) else None
+        self.__created = ospath.getctime(path) if ospath.exists(path) else None
+        self.__last_modif = ospath.getmtime(path) if ospath.exists(path) else None
+        self.__perm = oct(stat(path).st_mode & 0o777) if ospath.exists(path) else None
         self.__lines = self.split()
+        self.__running = True
+        self.__tasks = []
 
     @property
     def created(self) -> float:
@@ -636,23 +638,80 @@ class File:
         else:
             raise StopIteration
 
+    def __sub__(self, index: int) -> None:
+        """Removes data from the file by subtracting bytes from the end."""
+        if index < self.__len__():
+            self.__newt(self.__write, self.path+self.name+self.extention, self.__binary[:-index], "wb")
+        return self
+
+    def __add__(self, value: Union[str, bytes]) -> None:
+        """Adds data to the file by appending it."""
+        self.append(value)
+        return self
+
     def append(self, data: Union[str, bytes]) -> None:
         """Appends data to the file."""
-        Thread(target=self.__write, args=(data)).start()
-
-    def __write(self, data: Union[str, bytes]) -> None:
-        """Writes data to the file."""
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
-            raise ValueError("data must be bytes or str")
+            raise ValueError("value must be bytes or str")
         self.__binary += data
-        open(self.name + self.extention, "wb").write(self.__binary)
+        self.__newt(self.__write, self.path+self.name+self.extention, data, "ab")
 
-    def __add__(self, value: object) -> None:
-        """Adds data to the file."""
-        Thread(target=self.__write, args=(str(value))).start()
-        return self
+    def clear(self) -> None:
+        """Clears the content of the file."""
+        self.__newt(self.__write, "", "wb")
+
+    def rename(self, name: str) -> None:
+        """Renames the file to the specified name."""
+        self.__newt(rename, self.path+self.name+self.extention, self.path+name+self.extention)
+        self.name = name
+
+    def move(self, path: str) -> None:
+        """Moves the file to the specified path."""
+        self.__newt(move, self.path+self.name+self.extention, path+self.name+self.extention)
+        self.path = path
+
+    def find(self, value: str) -> int:
+        """Finds the index of the first occurrence of a value in the file."""
+        return self.__str__().find(value)
+
+    def drop(self, value: str) -> None:
+        """Removes the first occurrence of a value from the file."""
+        content = self.__str__().replace(value, "", 1)
+        self.__binary = content.encode(self.__encoding)
+        self.__newt(self.__write, self.path+self.name+self.extention, self.__binary, "wb")
+
+    def insert(self, index: int, data: Union[str, bytes]) -> None:
+        """Inserts data into the file at the specified index."""
+        if isinstance(data, str):
+            data = data.encode(self.__encoding)
+        elif not isinstance(data, bytes):
+            raise ValueError("value must be bytes or str")
+
+        if index < 0 or index > len(self.__binary):
+            raise IndexError("Index out of range")
+
+        self.__binary = self.__binary[:index] + data + self.__binary[index:]
+        self.__newt(self.__write, self.path + self.name + self.extention, self.__binary, "wb")
+
+    def __write(self, path: str, data: bytes, method: str = "wb") -> None:
+        """Writes binary data to the file at the specified path."""
+        open(path, method).write(data)
+
+    def __newt(self, func: callable, *args) -> None:
+        """Schedules a task to be executed in a separate thread."""
+        if self.__running:
+            self.__tasks.append((func, args))
+        else:
+            Thread(target=self.__run).start()
+
+    def __run(self) -> None:
+        """Executes all scheduled tasks in a separate thread."""
+        self.__running = True
+        for i, args in self.__tasks:
+            i[*args]
+        self.__running = False
 
 
 class Strloading:
@@ -817,7 +876,7 @@ def rod(value: str) -> str:
 
 
 class EscapeSequence(str):
-    ANSI_ESCAPE_PATTERN = compile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
+    ANSI_ESCAPE_PATTERN = recompile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
     def __init__(self, value: str = "") -> None:
         """A class to handle and iterate over ANSI escape sequences in strings..
 
