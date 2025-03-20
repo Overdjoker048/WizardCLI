@@ -10,7 +10,7 @@ __title__ = 'WizzardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 __all__ = [
     'CLI', 'echo', 'prompt', 'writelog',
     'colored', 'gradiant', 'gram', 'exectime',
