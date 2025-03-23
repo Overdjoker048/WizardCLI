@@ -21,7 +21,7 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 __all__ = [
     'CLI', 'echo', 'prompt', 'writelog',
     'colored', 'gradiant', 'gram', 'exectime',
@@ -33,7 +33,7 @@ __all__ = [
 from datetime import datetime
 from os import path as ospath, name, system, kill, getpid, stat, mkdir, rename
 from typing import Union, Callable as Tcallable, Tuple
-from time import sleep, perf_counter
+from time import sleep, perf_counter_ns
 from colorama import init
 from inspect import Signature, signature, stack
 from shlex import split as splitS
@@ -448,7 +448,7 @@ def gradiant(
     end: Union[tuple, str],
     sep: str = ""
     ) -> str:
-    """Create text with color gradient effect.
+    """Create text with color gradient effect while preserving existing styles.
 
     Arguments:
         text (str): Text to apply gradient to.
@@ -457,7 +457,7 @@ def gradiant(
         sep (str, optional): Separator for splitting text into segments. Defaults to "".
 
     Return:
-        str: Text with color gradient applied.
+        str: Text with color gradient applied, preserving styles.
 
     Example of use:
         >>> import WizardCLI
@@ -467,17 +467,16 @@ def gradiant(
     start = list(__to_rgb(start))
     end = __to_rgb(end)
     if sep == "":
-        text = [caractere for caractere in str(text)]
+        text = [char for char in EscapeSequence(text)]
     else:
         text = str(text).split(sep)
     steps = max(len(text) - 1, 1)
     diff = [(end[i] - start[i]) / steps for i in range(3)]
     for index, item in enumerate(text):
         current = [int(start[j] + diff[j] * index) for j in range(3)]
-        if index > len(text)-2:
-            txt += colored(text=item, color=current)
-        else:
-            txt += colored(text=item + sep, color=current)
+        color_code = "\033[38;2;{};{};{}m".format(*current)
+        txt += "{}{}".format(color_code, item)
+    txt += "\033[0m"  # Reset styles at the end
     return txt
 
 
@@ -506,7 +505,7 @@ def gram() -> Tuple[dict, int]:
 
 
 def exectime(func: callable) -> Tcallable:
-    """Decorator to measure function execution time.
+    """Decorator to measure function execution time in nanoseconds.
 
     Argument:
         func (callable): Function to measure.
@@ -522,9 +521,8 @@ def exectime(func: callable) -> Tcallable:
     """
     @wraps(func)
     def wrapper(**kwargs) -> any:
-        start = perf_counter()
-        result = func(**kwargs)
-        return "{:.2f} ms".format((perf_counter() - start) * 1000), result
+        start = perf_counter_ns()
+        return perf_counter_ns() - start, func(**kwargs)
     return wrapper
 
 
@@ -576,7 +574,7 @@ class File:
         self.__last_modif = ospath.getmtime(path) if ospath.exists(path) else None
         self.__perm = oct(stat(path).st_mode & 0o777) if ospath.exists(path) else None
         self.__lines = self.split()
-        self.__running = True
+        self.__running = False
         self.__tasks = []
 
     @property
@@ -641,7 +639,7 @@ class File:
     def __sub__(self, index: int) -> None:
         """Removes data from the file by subtracting bytes from the end."""
         if index < self.__len__():
-            self.__newt(self.__write, self.path+self.name+self.extention, self.__binary[:-index], "wb")
+            self.__newt(self.__write, self.__binary[:-index], "wb")
         return self
 
     def __add__(self, value: Union[str, bytes]) -> None:
@@ -656,7 +654,7 @@ class File:
         elif not isinstance(data, bytes):
             raise ValueError("value must be bytes or str")
         self.__binary += data
-        self.__newt(self.__write, self.path+self.name+self.extention, data, "ab")
+        self.__newt(self.__write, data, "ab")
 
     def clear(self) -> None:
         """Clears the content of the file."""
@@ -669,7 +667,7 @@ class File:
 
     def move(self, path: str) -> None:
         """Moves the file to the specified path."""
-        self.__newt(move, self.path+self.name+self.extention, path+self.name+self.extention)
+        self.__newt(move, path+self.name+self.extention)
         self.path = path
 
     def find(self, value: str) -> int:
@@ -680,7 +678,7 @@ class File:
         """Removes the first occurrence of a value from the file."""
         content = self.__str__().replace(value, "", 1)
         self.__binary = content.encode(self.__encoding)
-        self.__newt(self.__write, self.path+self.name+self.extention, self.__binary, "wb")
+        self.__newt(self.__write, self.__binary, "wb")
 
     def insert(self, index: int, data: Union[str, bytes]) -> None:
         """Inserts data into the file at the specified index."""
@@ -693,7 +691,7 @@ class File:
             raise IndexError("Index out of range")
 
         self.__binary = self.__binary[:index] + data + self.__binary[index:]
-        self.__newt(self.__write, self.path + self.name + self.extention, self.__binary, "wb")
+        self.__newt(self.__write, self.__binary, "wb")
 
     def __write(self, path: str, data: bytes, method: str = "wb") -> None:
         """Writes binary data to the file at the specified path."""
@@ -701,21 +699,51 @@ class File:
 
     def __newt(self, func: callable, *args) -> None:
         """Schedules a task to be executed in a separate thread."""
-        if self.__running:
-            self.__tasks.append((func, args))
-        else:
+        self.__tasks.append((func, args))
+        if not self.__running:
             Thread(target=self.__run).start()
 
     def __run(self) -> None:
         """Executes all scheduled tasks in a separate thread."""
         self.__running = True
-        for i, args in self.__tasks:
-            i[*args]
+        while self.__tasks:
+            move_task = None
+            write_tasks = []
+            rename_task = None
+            other_tasks = []
+            for func, args in self.__tasks:
+                if func == self.__write:
+                    write_tasks.append((func, args))
+                elif func == move:
+                    move_task = (func, args)
+                elif func == rename:
+                    rename_task = (func, args)
+                else:
+                    other_tasks.append((func, args))
+            if write_tasks:
+                last_write_wb_index = None
+                for i, (_, args) in enumerate(write_tasks):
+                    if args[-1] == "wb":
+                        last_write_wb_index = i
+                if last_write_wb_index is not None:
+                    write_tasks = write_tasks[last_write_wb_index:]
+            self.__tasks = []
+            if rename_task:
+                self.__tasks.append(rename_task)
+            if move_task:
+                self.__tasks.append(move_task)
+            self.__tasks.extend(write_tasks)
+            self.__tasks.extend(other_tasks)
+            func, args = self.__tasks.pop(0)
+            if func == rename:
+                func(*args)
+            else:
+                func(self.path+self.name+self.extention, *args)
         self.__running = False
 
 
 class Strloading:
-    def __init__(self, cool: float = 0.1) -> None:
+    def __init__(self) -> None:
         """
         Creates a rotating loading animation with characters | / - \\
 
@@ -724,13 +752,12 @@ class Strloading:
 
         Example of use:
             >>> import WizardCLIrdCLI
-            >>> anim = WizardCLI.strloading(cool=0.1)=0.1)
+            >>> anim = WizardCLI.strloading()
             >>> for _ in range(5):
             ...     anim.print()
             # Output will show: | → / → - → \\ → |
         """
         self.__cached = 0
-        self.cool = cool
         self.__strcache = "|"
 
     def print(self) -> None:
@@ -741,7 +768,7 @@ class Strloading:
 
 
 class Strwait:
-    def __init__(self, cool: float = 1.0) -> None:
+    def __init__(self) -> None:
         """
         Creates a "dots" waiting animation (. .. ...)
 
@@ -750,12 +777,11 @@ class Strwait:
 
         Example of use:
             >>> import WizardCLIrdCLI
-            >>> anim = WizardCLI.strwait(cool=0.5)=0.5)
+            >>> anim = WizardCLI.strwait()
             >>> for _ in range(3):
             ...     anim.print()
             # Output will show: Loading. → Loading.. → Loading...
         """
-        self.cool = cool
         self.__points = 1
         self.__strcache = "."
 
@@ -888,7 +914,10 @@ class EscapeSequence(str):
             >>> esc_seq = WizardCLI.EscapeSequence("\033[31mHello\033[0m")
         """
         super().__init__()
-        self.value = value
+        if not isinstance(value, str):
+            self.value = "".join(map(str, values))
+        else:
+            self.value = value
 
     def __repr__(self) -> str:
         """Returns a string representation of the EscapeSequence object."""
