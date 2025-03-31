@@ -21,7 +21,7 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 __all__ = [
     'CLI', 'echo', 'prompt', 'writelog',
     'colored', 'gradiant', 'gram', 'exectime',
@@ -411,15 +411,19 @@ def writelog(*values: object,
         file.write("{} {}".format(datetime.now().strftime('%H:%M:%S'), text))
 
 
-def __to_rgb(color: Union[tuple, str] = None) -> tuple:
+def __to_rgb(color: Union[tuple, str, list] = None) -> tuple:
     "Format le code couleur entré vers un code RGB."
     if isinstance(color, str):
         return tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
-    return tuple(int(v) for v in color)
+    elif isinstance(color, list) or isinstance(color, tuple):
+        return tuple(int(v) for v in color)
+    else:
+        raise TypeError("Invalid color format. Expected tuple, list, or hex string.")
 
 
 def colored(text: str,
-            color: Union[tuple, str, list] = None
+            color: Union[tuple, str, list] = None,
+            reset: bool = True
             ) -> str:
     """Convert text to colored text using ANSI escape codes.
 
@@ -439,7 +443,9 @@ def colored(text: str,
         return text
     else:
         color = __to_rgb(color)
-        return "\033[38;2;{};{};{}m{}\033[0m".format(int(color[0]), int(color[1]), int(color[2]), text)
+        if reset:
+            return "\033[38;2;{};{};{}m{}\033[0m".format(int(color[0]), int(color[1]), int(color[2]), text)
+        return "\033[38;2;{};{};{}m{}".format(int(color[0]), int(color[1]), int(color[2]), text)
 
 
 def gradiant(
@@ -447,37 +453,30 @@ def gradiant(
     start: Union[tuple, str],
     end: Union[tuple, str],
     sep: str = ""
-    ) -> str:
+) -> str:
     """Create text with color gradient effect while preserving existing styles.
 
     Arguments:
         text (str): Text to apply gradient to.
         start (Union[tuple, str]): Starting color in RGB tuple or hex format.
         end (Union[tuple, str]): Ending color in RGB tuple or hex format.
-        sep (str, optional): Separator for splitting text into segments. Defaults to "".
+        sep (str, optional): Separator for splitting text into segments.
 
     Return:
         str: Text with color gradient applied, preserving styles.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.gradiant("Hello World", (255,0,0), (0,0,255)))
     """
-    txt = ""
-    start = list(__to_rgb(start))
-    end = __to_rgb(end)
-    if sep == "":
-        text = [char for char in EscapeSequence(text)]
-    else:
-        text = str(text).split(sep)
-    steps = max(len(text) - 1, 1)
-    diff = [(end[i] - start[i]) / steps for i in range(3)]
-    for index, item in enumerate(text):
-        current = [int(start[j] + diff[j] * index) for j in range(3)]
-        color_code = "\033[38;2;{};{};{}m".format(*current)
-        txt += "{}{}".format(color_code, item)
-    txt += "\033[0m"  # Reset styles at the end
-    return txt
+    start_rgb = list(__to_rgb(start))
+    end_rgb = __to_rgb(end)
+    segments = [char for char in EscapeSequence(text)] if sep == "" else str(text).split(sep)
+    steps = max(len(segments) - 1, 1)
+    diffs = [(end_rgb[i] - start_rgb[i]) / steps for i in range(3)]
+    return "".join(
+        colored(
+            segment,
+            [int(start_rgb[j] + diffs[j] * i) for j in range(3)],
+            reset=False
+        ) for i, segment in enumerate(segments)
+    ) + "\033[0m"
 
 
 def gram() -> Tuple[dict, int]:
@@ -575,7 +574,11 @@ class File:
         self.__perm = oct(stat(path).st_mode & 0o777) if ospath.exists(path) else None
         self.__lines = self.split()
         self.__running = False
-        self.__tasks = []
+        self.__tasks = {
+            "rename": None,
+            "move": None,
+            "write": []
+        }
 
     @property
     def created(self) -> float:
@@ -639,10 +642,11 @@ class File:
     def __sub__(self, index: int) -> None:
         """Removes data from the file by subtracting bytes from the end."""
         if index < self.__len__():
-            self.__newt(self.__write, self.__binary[:-index], "wb")
+            self.__binary = self.__binary[:-index]
+            self.__newt(self.__write, self.__binary, "wb")
         return self
 
-    def __add__(self, value: Union[str, bytes]) -> None:
+    def __add__(self, value: any) -> None:
         """Adds data to the file by appending it."""
         self.append(value)
         return self
@@ -652,7 +656,7 @@ class File:
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
-            raise ValueError("value must be bytes or str")
+            data = str(data).encode(self.__encoding)
         self.__binary += data
         self.__newt(self.__write, data, "ab")
 
@@ -685,11 +689,9 @@ class File:
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
-            raise ValueError("value must be bytes or str")
-
+            data = str(data).encode(self.__encoding)
         if index < 0 or index > len(self.__binary):
             raise IndexError("Index out of range")
-
         self.__binary = self.__binary[:index] + data + self.__binary[index:]
         self.__newt(self.__write, self.__binary, "wb")
 
@@ -699,46 +701,29 @@ class File:
 
     def __newt(self, func: callable, *args) -> None:
         """Schedules a task to be executed in a separate thread."""
-        self.__tasks.append((func, args))
+        if func == rename:
+            self.__tasks["rename"] = (func, args)
+        elif func == move:
+            self.__tasks["move"] = (func, args)
+        elif func == self.__write:
+            if args[0] == "wb":
+                self.__tasks["write"] = [(func, args)]
+            else:
+                self.__tasks["write"].append((func, args))
         if not self.__running:
             Thread(target=self.__run).start()
 
     def __run(self) -> None:
         """Executes all scheduled tasks in a separate thread."""
         self.__running = True
-        while self.__tasks:
-            move_task = None
-            write_tasks = []
-            rename_task = None
-            other_tasks = []
-            for func, args in self.__tasks:
-                if func == self.__write:
-                    write_tasks.append((func, args))
-                elif func == move:
-                    move_task = (func, args)
-                elif func == rename:
-                    rename_task = (func, args)
-                else:
-                    other_tasks.append((func, args))
-            if write_tasks:
-                last_write_wb_index = None
-                for i, (_, args) in enumerate(write_tasks):
-                    if args[-1] == "wb":
-                        last_write_wb_index = i
-                if last_write_wb_index is not None:
-                    write_tasks = write_tasks[last_write_wb_index:]
-            self.__tasks = []
-            if rename_task:
-                self.__tasks.append(rename_task)
-            if move_task:
-                self.__tasks.append(move_task)
-            self.__tasks.extend(write_tasks)
-            self.__tasks.extend(other_tasks)
-            func, args = self.__tasks.pop(0)
-            if func == rename:
-                func(*args)
-            else:
-                func(self.path+self.name+self.extention, *args)
+        while self.__tasks["write"] or self.__tasks["rename"] or self.__tasks["move"]:
+            for key in ["rename", "move", "write"]:
+                if self.__tasks[key]:
+                    func, args = self.__tasks[key].pop(0)
+                    if key == "rename":
+                        func(*args)
+                    else:
+                        func(self.path+self.name+self.extention, *args)
         self.__running = False
 
 
@@ -816,91 +801,6 @@ def strpercent(value: float, total: float, size: int = 10, char: str = "█") ->
     return "{}{}".format(percent*char, (size-percent)*" ")
 
 
-def bold(value: str) -> str:
-    """
-    Applies bold effect to the given text.
-
-    Argument:
-        value (str): The text to format.
-
-    Return:
-        str: The text formatted in bold.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.bold("Bold text"))
-    """
-    return "\033[1m{}\033[0m".format(value)
-
-
-def italics(value: str) -> str:
-    """
-    Applies italics effect to the given text.
-
-    Argument:
-        value (str): The text to format.
-
-    Return:
-        str: The text formatted in italics.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.italics("Italic text"))
-    """
-    return "\033[3m{}\033[0m".format(value)
-
-
-def underline(value: str) -> str:
-    """
-    Applies underline effect to the given text.
-
-    Argument:
-        value (str): The text to format.
-
-    Return:
-        str: The text formatted with underline.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.underline("Underlined text"))
-    """
-    return "\033[4m{}\033[0m".format(value)
-
-
-def reverse(value: str) -> str:
-    """
-    Applies reverse color effect to the given text.
-
-    Argument:
-        value (str): The text to format.
-
-    Return:
-        str: The text formatted with reverse colors.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.reverse("Text with reverse colors"))
-    """
-    return "\033[7m{}\033[0m".format(value)
-
-
-def rod(value: str) -> str:
-    """
-    Applies strikethrough effect to the given text.
-
-    Argument:
-        value (str): The text to format.
-
-    Return:
-        str: The text formatted with strikethrough.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.rod("Strikethrough text"))
-    """
-    return "\033[9m{}\033[0m".format(value)
-
-
 class EscapeSequence(str):
     ANSI_ESCAPE_PATTERN = recompile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
     def __init__(self, value: str = "") -> None:
@@ -915,7 +815,7 @@ class EscapeSequence(str):
         """
         super().__init__()
         if not isinstance(value, str):
-            self.value = "".join(map(str, values))
+            self.value = "".join(map(str, value))
         else:
             self.value = value
 
@@ -945,3 +845,32 @@ class EscapeSequence(str):
         if self.index >= len(self.value):
             raise StopIteration
         return self.nextchar()
+
+def rst() -> str:
+    """Returns the ANSI escape code to reset text formatting."""
+    return "\033[0m"
+
+
+def bld() -> str:
+    """Returns the ANSI escape code for bold text."""
+    return "\033[1m"
+
+
+def itl() -> str:
+    """Returns the ANSI escape code for italic text."""
+    return "\033[3m"
+
+
+def und() -> str:
+    """Returns the ANSI escape code for underlined text."""
+    return "\033[4m"
+
+
+def rev() -> str:
+    """Returns the ANSI escape code for reversed text color."""
+    return "\033[7m"
+
+
+def strk() -> str:
+    """Returns the ANSI escape code for strikethrough text."""
+    return "\033[9m"
