@@ -1,8 +1,8 @@
 #WizardCLI/__init__.py
 from .core import (
     CLI, echo, prompt, writelog, colored, gradiant, gram, exectime,
-    File, optional, Strwait, Strloading, strpercent, bold, italics,
-    underline, reverse, rod, EscapeSequence
+    File, optional, Strwait, Strloading, EscapeSequence, rst, bld, itl,
+    und, rev, strk
 )
 
 __encoding__ = "UTF-8"
