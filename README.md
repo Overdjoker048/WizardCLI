@@ -1,7 +1,7 @@
 # WizardCLI
 ![Python Version](https://img.shields.io/badge/Python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Version](https://img.shields.io/badge/Version-1.3.4-yellow)
+![Version](https://img.shields.io/badge/Version-1.3.5-yellow)
 
 A simple and efficient command-line tool written in Python.
 
@@ -30,7 +30,7 @@ WizardCLI is a command-line utility that provides a powerful framework for creat
 - **Text Effects**: Bold, italics, underline, reverse, and strikethrough text effects
 - **Escape Sequences**: Handling and iterating over ANSI escape sequences
 
-## Quick Example Usage
+## Quick Exemple Usage
 ```python
 import WizardCLI
 
@@ -38,11 +38,10 @@ import WizardCLI
 cli = WizardCLI.CLI(
     prompt="[{}]@[{}]\\>", # Customizable prompt
     user="MyApp", # Username in prompt
-    title="My CLI App", # Window title
     logs=True, # Enable logging
     anim=True, # Enable text animation
     cool=0.1, # Animation speed
-    color=(255, 0, 0) # Text color (RGB)
+    color=(255,0,0) # Text color (RGB)
 )
 
 # Create a simple command
