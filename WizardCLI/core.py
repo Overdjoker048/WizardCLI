@@ -21,18 +21,18 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.4'
+__version__ = '1.3.5'
 __all__ = [
     'CLI', 'echo', 'prompt', 'writelog',
     'colored', 'gradiant', 'gram', 'exectime',
     'File', 'optional', 'Strwait', 'Strloading',
-    'strpercent', 'bold', 'italics', 'underline'
-    'reverse', 'rod', 'EscapeSequence'
+    'strpercent', 'EscapeSequence', 'bld', 'rst',
+    'itl', 'und', 'rev', 'strk', 'bg'
 ]
 
 from datetime import datetime
-from os import path as ospath, name, system, kill, getpid, stat, mkdir, rename
-from typing import Union, Callable as Tcallable, Tuple
+from os import path as ospath, name, kill, getpid, stat, mkdir, rename
+from typing import Union, Callable as Tcallable, Tuple, Optional
 from time import sleep, perf_counter_ns
 from colorama import init
 from inspect import Signature, signature, stack
@@ -50,18 +50,16 @@ class CLI:
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
-                 title: str = None,
                  logs: bool = True,
                  anim: bool = True,
                  cool: float = 0.1,
-                 color: Union[tuple, str] = None
+                 color: Optional[Union[tuple, str]] = None
                  ) -> None:
         """This object allows the creation of the CLI.
 
         Arguments:
             prompt (str): Text displayed in terminal when entering commands. Defaults to "[{}]@[{}]\\>".
             user (str): Username displayed in prompt. Defaults to "Python-Cli".
-            title (str, optional): Window title. Defaults to None.
             logs (bool): Enable/disable action logging. Defaults to True.
             anim (bool): Enable/disable progressive text display. Defaults to True.
             cool (float): Delay between characters for animation. Defaults to 0.1.
@@ -75,8 +73,6 @@ class CLI:
             ...    print("Hello World")
             >>> cli.run()
         """
-        if title is not None:
-            system("title {}".format(title) if name == 'nt' else "echo -n '\033]0;{}\007'".format(title))
 
         self.__cmd = {}
         self.prompt = prompt
@@ -96,8 +92,8 @@ class CLI:
             self.change_directory(path)
 
     def command(self,
-                name: str = None,
-                doc: str = None,
+                name: Optional[str] = None,
+                doc: Optional[str] = None,
                 alias : list = []
                 ) -> Tcallable:
         """The command decorator allows you to define a function as a command for the CLI.
@@ -155,7 +151,7 @@ class CLI:
 
     def clear_host(self) -> None:
         "Reset the display of the terminal."
-        system(self.__clear_cmd)
+        print("\033[H\033[J", end="")
 
     def __format(self, name: str, cmd: dict) -> dict:
         "Format data of command."
@@ -305,7 +301,7 @@ class CLI:
             except KeyboardInterrupt:
                 kill(getpid(), 9)
             except Exception as e:
-                echo(colored("An unexpected error occurred: {}".format(e), self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                echo(colored("An unexpected error occurred: {}".format(e), self.color), anim=self.anim, cool=self.logs)
 
 
 def echo(*values: object,
@@ -315,7 +311,7 @@ def echo(*values: object,
          cool: float = 0.1,
          logs: bool = False,
          flush: bool = False,
-         file: None = None,
+         file: Optional[None] = None,
          ) -> None:
     """Print message with animation and logging capabilities.
 
@@ -411,7 +407,7 @@ def writelog(*values: object,
         file.write("{} {}".format(datetime.now().strftime('%H:%M:%S'), text))
 
 
-def __to_rgb(color: Union[tuple, str, list] = None) -> tuple:
+def __to_rgb(color: Optional[Union[tuple, str, list]] = None) -> tuple:
     "Format le code couleur entré vers un code RGB."
     if isinstance(color, str):
         return tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
@@ -422,7 +418,7 @@ def __to_rgb(color: Union[tuple, str, list] = None) -> tuple:
 
 
 def colored(text: str,
-            color: Union[tuple, str, list] = None,
+            color: Optional[Union[tuple, str, list]] = None,
             reset: bool = True
             ) -> str:
     """Convert text to colored text using ANSI escape codes.
@@ -503,26 +499,33 @@ def gram() -> Tuple[dict, int]:
     return (gmemory, memory)
 
 
-def exectime(func: callable) -> Tcallable:
+def exectime(repeat: int = 1):
     """Decorator to measure function execution time in nanoseconds.
 
-    Argument:
-        func (callable): Function to measure.
+        Argument:
+            repeat (int): Number of times to repeat the function. Defaults to 1.
 
-    Return:
-        Callable: Wrapped function that prints execution time.
+        Return:
+            Callable: Wrapped function that prints execution time.
 
-    Example of use:
-        >>> import WizardCLI
-        >>> @WizardCLI.exectime
-        >>> def hello_world():
-        ...    print("Hello World")
-    """
-    @wraps(func)
-    def wrapper(**kwargs) -> any:
-        start = perf_counter_ns()
-        return perf_counter_ns() - start, func(**kwargs)
-    return wrapper
+        Example of use:
+            >>> import WizardCLI
+            >>> @WizardCLI.exectime(repeat=5)
+            >>> def hello_world():
+            ...    print("Hello World")
+        """
+    def decorator(func: callable) -> Tcallable:
+        @wraps(func)
+        def wrapper(**kwargs) -> tuple[int, any]:
+            avg = 0
+            for _ in range(repeat):
+                start = perf_counter_ns()
+                result = func(**kwargs)
+                avg += perf_counter_ns() - start
+            avg /= repeat
+            return avg, result
+        return decorator
+    return exectime
 
 
 def optional(*defaults):
@@ -846,6 +849,7 @@ class EscapeSequence(str):
             raise StopIteration
         return self.nextchar()
 
+
 def rst() -> str:
     """Returns the ANSI escape code to reset text formatting."""
     return "\033[0m"
@@ -874,3 +878,26 @@ def rev() -> str:
 def strk() -> str:
     """Returns the ANSI escape code for strikethrough text."""
     return "\033[9m"
+
+def bg(text: str,
+       color: Union[tuple, str, list] = None,
+       reset: bool = True
+       ) -> str:
+    """Returns the ANSI escape code for foreground color.
+
+    Arguments:
+        color (Union[tuple, str]): Color in RGB tuple or hex string format.
+
+    Return:
+        str: ANSI escape code for the specified foreground color.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.fg((255, 0, 0)))
+        >>> print(WizardCLI.fg("FF0000"))
+    """
+    if color is None:
+        return text
+    if reset:
+        return "\033[48;2;{};{};{}m{}\033[0m".format(color[0], color[1], color[2], text)
+    return "\033[48;2;{};{};{}m{}".format(color[0], color[1], color[2], text)
