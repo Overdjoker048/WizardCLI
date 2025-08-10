@@ -21,27 +21,26 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.3.5'
+__version__ = '1.4.0'
 __all__ = [
-    'CLI', 'echo', 'prompt', 'writelog',
-    'colored', 'gradiant', 'gram', 'exectime',
-    'File', 'optional', 'Strwait', 'Strloading',
-    'strpercent', 'EscapeSequence', 'bld', 'rst',
-    'itl', 'und', 'rev', 'strk', 'bg'
+    'CLI', 'gradiant', 'gram', 'benchmark', 
+    'File', 'optional', 'exectime', 'fg', 
+    'bg', 'rst', 'itl', 'und', 'rev', 'strk',
+    'bld', 'strimg'
 ]
 
-from datetime import datetime
-from os import path as ospath, name, kill, getpid, stat, mkdir, rename
-from typing import Union, Callable as Tcallable, Tuple, Optional
-from time import sleep, perf_counter_ns
+from os import path as ospath, name, kill, getpid, stat, rename
+from typing import Union, Callable as Tcallable, Optional
+from time import perf_counter_ns
 from colorama import init
 from inspect import Signature, signature, stack
 from shlex import split as splitS
-from functools import wraps
+from functools import wraps, lru_cache
 from pympler import asizeof
 from threading import Thread
 from re import compile as recompile
-from shutil import move
+from shutil import move, get_terminal_size
+from PIL import Image
 
 init()
 
@@ -50,20 +49,14 @@ class CLI:
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
-                 logs: bool = True,
-                 anim: bool = True,
-                 cool: float = 0.1,
-                 color: Optional[Union[tuple, str]] = None
+                 formating: str = ""
                  ) -> None:
         """This object allows the creation of the CLI.
 
         Arguments:
             prompt (str): Text displayed in terminal when entering commands. Defaults to "[{}]@[{}]\\>".
             user (str): Username displayed in prompt. Defaults to "Python-Cli".
-            logs (bool): Enable/disable action logging. Defaults to True.
-            anim (bool): Enable/disable progressive text display. Defaults to True.
-            cool (float): Delay between characters for animation. Defaults to 0.1.
-            color (Union[tuple, str], optional): Text color in RGB or hex. Defaults to None.
+            formating (str): Text format for the prompt. Defaults to "".
 
         Example of use:
             >>> import WizardCLI
@@ -74,17 +67,13 @@ class CLI:
             >>> cli.run()
         """
 
-        self.__cmd = {}
-        self.prompt = prompt
-        self.user = user
-        self.path = CLI.home
-        self.logs = logs
-        self.anim = anim
-        self.cool = cool
-        self.color = color
-        self.__clear_cmd = "cls" if name == 'nt' else "clear"
+        self.__cmd: dict = {}
+        self.prompt: str = prompt
+        self.user: str = user
+        self.path: str = CLI.home
+        self.format: str = formating
         self.command(alias=["?"], doc=self.help.__doc__)(self.help)
-        self.command(alias=[self.__clear_cmd], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
+        self.command(alias=["cls" if name == 'nt' else "clear"], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
         self.command(alias=["exit"], doc=self.leave.__doc__)(self.leave)
         @self.command(alias=["cd"], doc=self.change_directory.__doc__)
         @optional(CLI.home)
@@ -115,7 +104,7 @@ class CLI:
             >>> cli.run()
         """
         def decorator(func: callable) -> Tcallable:
-            def wrapper(name: str, doc: str, alias: list) -> None:
+            def wrapper(name: str, doc: str, alias: list[str]) -> None:
                 if doc is None:
                     doc = ""
                 data = {"function": func}
@@ -184,9 +173,9 @@ class CLI:
         if not m:
             lines = ["{} {}".format(cmd.ljust(max_length), cmds[cmd]['doc']) for cmd in sorted(cmds)]
         text = "\n".join(lines)
-        echo(colored(text, self.color), anim=self.anim, cool=self.cool)
+        print(fg(text, self.color))
 
-    def change_directory(self, path : str) -> None:
+    def change_directory(self, path: str) -> None:
         "Allows you to change the location of the terminal in your files."
         npath = ospath.join(self.path, path)
         if ospath.isdir(npath):
@@ -196,7 +185,7 @@ class CLI:
         if ospath.isdir(path):
             self.path = str(path).title()
         else:
-            echo(colored("The path is invalid.", self.color), anim=self.anim, cool=self.cool)
+            print(fg("The path is invalid.", self.color))
 
     def __decode(self, tpe: object, value: any) -> object:
         "Format arguments in the types chosen when creating commands."
@@ -253,7 +242,7 @@ class CLI:
             if arg.startswith("--"):
                 value = cmd["params"].get(arg)
                 if value is None:
-                    echo(colored("Unknown Parameter", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                    print(fg("Unknown Parameter", self.color))
                     do = True
                     break
                 kwargs[arg[2:]] = None if index + 1 >= len(entry) else self.__decode(value[0], entry[index + 1])
@@ -264,10 +253,10 @@ class CLI:
                 else:
                     if arg == "-?":
                         do = True
-                        echo(colored(cmd["info"], self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                        print(fg(cmd["info"], self.color))
                         break
                     else:
-                        echo(colored("Unknown Option", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                        print(fg("Unknown Option", self.color))
                         do = True
                         break
             else:
@@ -275,7 +264,7 @@ class CLI:
                     kwargs[cmd["args"][arg_i][0].strip("[]")] = self.__decode(cmd["args"][arg_i][1], arg)
                     arg_i += 1
                 else:
-                    echo(colored("Too many arguments provided.", self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                    print(fg("Too many arguments provided.", self.color))
                     do = True
                     break
             index += 1
@@ -284,16 +273,14 @@ class CLI:
 
     def run(self) -> None:
         "This method of the CLI object allows you to launch the CLI after you have created all your commands."
-        if self.logs:
-            writelog(self.__cmd)
         while True:
             try:
-                entry = splitS(prompt(self.prompt.format(self.user, self.path), anim=self.anim, cool=self.cool, logs=self.logs))
+                entry = splitS(input(self.prompt.format(self.user, self.path)))
                 if not entry:
                     continue
                 cmd = self.__cmd.get(entry[0].lower())
                 if cmd is None:
-                    echo(colored("{} doesn't exist.\nDo help to get the list of existing commands.".format(entry[0]), self.color), anim=self.anim, cool=self.cool, logs=self.logs)
+                    print(fg("{} doesn't exist.\nDo help to get the list of existing commands.".format(entry[0]), self.color))
                     continue
                 if isinstance(cmd, str):
                     cmd = self.__cmd[cmd]
@@ -301,155 +288,15 @@ class CLI:
             except KeyboardInterrupt:
                 kill(getpid(), 9)
             except Exception as e:
-                echo(colored("An unexpected error occurred: {}".format(e), self.color), anim=self.anim, cool=self.logs)
-
-
-def echo(*values: object,
-         sep: str = " ",
-         end: str = "\n",
-         anim: bool = True,
-         cool: float = 0.1,
-         logs: bool = False,
-         flush: bool = False,
-         file: Optional[None] = None,
-         ) -> None:
-    """Print message with animation and logging capabilities.
-
-    Arguments:
-        values (object): Values to print.
-        sep (str): Separator between values. Defaults to " ".
-        end (str): String appended after the last value. Defaults to "\\n".
-        anim (bool): Enable/disable progressive display. Defaults to True.
-        cool (float): Delay between characters for animation. Defaults to 0.1.
-        logs (bool): Enable/disable logging. Defaults to False.
-        flush (bool): Force flush the output. Defaults to False.
-        file (TextIO, optional): File-like object to write to. Defaults to None.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> WizardCLI.echo("Hello World", anim=True, cool=15, logs=True)
-    """
-    output = sep.join(map(str, values))
-    if len(output) != 0:
-        times =  cool / len(output)
-    if anim:
-        for char in EscapeSequence(output):
-            print(char, end="", flush=True, file=file)
-            sleep(times)
-        print(end=end)
-    else:
-        print(output, end=end, flush=flush, file=file)
-    if logs:
-        writelog(output)
-
-
-def prompt(__prompt: object = "",
-           anim: bool = True,
-           cool: float = 0.1,
-           logs: bool = False,
-           flush: bool = False
-           ) -> str:
-    """The prompt method works like the input method which is already implemented in Python but has a progressive display
-    system if the value of the anim parameter is set to True and also includes a logging system that writes the
-    text that the user will respond to in the daily logs. The logging system is enabled by default. The cool
-    parameter corresponds to the exposure time before displaying the next character (in MS) of the text you have entered
-    if the anim parameter is set to True.
-
-    Arguments:
-        __prompt (object): The prompt text to display.
-        anim (bool): Enable/disable progressive display. Defaults to True.
-        cool (float): Delay between characters for animation. Defaults to 0.1.
-        logs (bool): Enable/disable logging. Defaults to False.
-        flush (bool): Force flush the output. Defaults to False.
-
-    Return:
-        str: The user's input.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> WizardCLI.prompt("What's your name?", anim=True, cool=15, logs=True)
-    """
-    __prompt = EscapeSequence(__prompt)
-    if len(__prompt) != 0:
-        times =  cool / len(__prompt)
-    if anim:
-        for i in __prompt:
-            print(i, end="", flush=flush)
-            sleep(times)
-    else:
-        print(__prompt, end="", flush=flush)
-    returned = input()
-    if logs:
-        writelog(returned)
-    return returned
-
-
-def writelog(*values: object,
-               sep: str = " ",
-               end: str = "\n",
-               ) -> None:
-    """The writelog method allows writing in the daily logs. This method works like the print method which is already 
-    implemented in Python for the sep and end parameters.
-
-    Arguments:
-        values (object): Values to write to the log.
-        sep (str): Separator between values. Defaults to " ".
-        end (str): String appended after the last value. Defaults to "\\n".
-
-    Example of use:
-        >>> import WizardCLI
-        >>> WizardCLI.writelog("CLI was starting.")
-    """
-    text = sep.join(map(str, values)) + end
-    if not ospath.exists("latest"):
-        mkdir("latest")
-    with open(ospath.join("latest", "{}.log".format(datetime.today().date())), "a", encoding="UTF-8") as file:
-        file.write("{} {}".format(datetime.now().strftime('%H:%M:%S'), text))
-
-
-def __to_rgb(color: Optional[Union[tuple, str, list]] = None) -> tuple:
-    "Format le code couleur entré vers un code RGB."
-    if isinstance(color, str):
-        return tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
-    elif isinstance(color, list) or isinstance(color, tuple):
-        return tuple(int(v) for v in color)
-    else:
-        raise TypeError("Invalid color format. Expected tuple, list, or hex string.")
-
-
-def colored(text: str,
-            color: Optional[Union[tuple, str, list]] = None,
-            reset: bool = True
-            ) -> str:
-    """Convert text to colored text using ANSI escape codes.
-
-    Arguments:
-        text (str): Text to be colored.
-        color (Union[tuple, str, list], optional): Color in RGB tuple or hex string format. Defaults to None.
-
-    Return:
-        str: ANSI colored text string.
-
-    Example of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.colored("Hello World", "FF0000"))
-        >>> print(WizardCLI.colored("Hello World", (255, 0, 0)))
-    """
-    if color is None:
-        return text
-    else:
-        color = __to_rgb(color)
-        if reset:
-            return "\033[38;2;{};{};{}m{}\033[0m".format(int(color[0]), int(color[1]), int(color[2]), text)
-        return "\033[38;2;{};{};{}m{}".format(int(color[0]), int(color[1]), int(color[2]), text)
+                print(fg("An unexpected error occurred: {}".format(e), self.color))
 
 
 def gradiant(
     text: str,
-    start: Union[tuple, str],
-    end: Union[tuple, str],
-    sep: str = ""
-) -> str:
+    start: Union[tuple, str, list],
+    end: Union[tuple, str, list],
+    sep: Optional[str] = ""
+    ) -> str:
     """Create text with color gradient effect while preserving existing styles.
 
     Arguments:
@@ -461,21 +308,19 @@ def gradiant(
     Return:
         str: Text with color gradient applied, preserving styles.
     """
-    start_rgb = list(__to_rgb(start))
-    end_rgb = __to_rgb(end)
-    segments = [char for char in EscapeSequence(text)] if sep == "" else str(text).split(sep)
+    start_rgb = list(fg(start))
+    end_rgb = fg(end)
+    segments = [char for char in __EscapeSequence(text)] if sep == "" else str(text).split(sep)
     steps = max(len(segments) - 1, 1)
     diffs = [(end_rgb[i] - start_rgb[i]) / steps for i in range(3)]
     return "".join(
-        colored(
-            segment,
-            [int(start_rgb[j] + diffs[j] * i) for j in range(3)],
-            reset=False
-        ) for i, segment in enumerate(segments)
+        fg(
+            [int(start_rgb[j] + diffs[j] * i) for j in range(3)]
+        ) + segment for i, segment in enumerate(segments)
     ) + "\033[0m"
 
 
-def gram() -> Tuple[dict, int]:
+def gram() -> tuple:
     """Display memory usage of the program.
 
     Return:
@@ -499,7 +344,7 @@ def gram() -> Tuple[dict, int]:
     return (gmemory, memory)
 
 
-def exectime(repeat: int = 1):
+def exectime(repeat: Optional[int] = 1):
     """Decorator to measure function execution time in nanoseconds.
 
         Argument:
@@ -516,16 +361,16 @@ def exectime(repeat: int = 1):
         """
     def decorator(func: callable) -> Tcallable:
         @wraps(func)
-        def wrapper(**kwargs) -> tuple[int, any]:
+        def wrapper(*args, **kwargs) -> tuple:
             avg = 0
             for _ in range(repeat):
                 start = perf_counter_ns()
-                result = func(**kwargs)
+                result = func(*args, **kwargs)
                 avg += perf_counter_ns() - start
             avg /= repeat
             return avg, result
-        return decorator
-    return exectime
+        return wrapper
+    return decorator
 
 
 def optional(*defaults):
@@ -541,7 +386,7 @@ def optional(*defaults):
     def decorator(func: callable) -> Tcallable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> any:
-            for i, (param_name, param) in enumerate(signature(func).parameters.items()):
+            for i, (param_name, _) in enumerate(signature(func).parameters.items()):
                 if param_name not in kwargs or kwargs[param_name] is Signature.empty:
                     if i < len(defaults):
                         kwargs[param_name] = defaults[i]
@@ -561,8 +406,8 @@ class File:
             encoding (str, optional): The encoding of the file. Defaults to "UTF-8".
 
         Example of use:
-            >>> import WizardCLIrdCLI
-            >>> file = WizardCLI.file("test.txt", "UTF-8")F-8")
+            >>> import WizardCLI
+            >>> file = WizardCLI.file("test.txt", "UTF-8")
         """
         self.name, self.extention = ospath.splitext(ospath.basename(path))
         self.path = ospath.dirname(path)
@@ -730,81 +575,7 @@ class File:
         self.__running = False
 
 
-class Strloading:
-    def __init__(self) -> None:
-        """
-        Creates a rotating loading animation with characters | / - \\
-
-        Return:
-            str: One of the characters in the sequence | / - \\
-
-        Example of use:
-            >>> import WizardCLIrdCLI
-            >>> anim = WizardCLI.strloading()
-            >>> for _ in range(5):
-            ...     anim.print()
-            # Output will show: | → / → - → \\ → |
-        """
-        self.__cached = 0
-        self.__strcache = "|"
-
-    def print(self) -> None:
-        "Displays the current animation character."
-        print(self.__strcache, end="\r", flush=True)
-        self.__cached = (self.__cached + 1) % 4
-        self.__strcache = ["|", "/", "-", "\\"][self.__cached]
-
-
-class Strwait:
-    def __init__(self) -> None:
-        """
-        Creates a "dots" waiting animation (. .. ...)
-
-        Return:
-            str: String containing 1-3 dots, right-padded with spaces to maintain width
-
-        Example of use:
-            >>> import WizardCLIrdCLI
-            >>> anim = WizardCLI.strwait()
-            >>> for _ in range(3):
-            ...     anim.print()
-            # Output will show: Loading. → Loading.. → Loading...
-        """
-        self.__points = 1
-        self.__strcache = "."
-
-    def print(self) -> None:
-        "Displays the current string of dots."
-        print(self.__strcache, end="\r", flush=True)
-        self.__points = (self.__points % 3) + 1
-        self.__strcache = "." * self.__points + " " * (3 - self.__points)
-
-
-def strpercent(value: float, total: float, size: int = 10, char: str = "█") -> str:
-    """Creates a progress bar visualization
-
-    Arguments:
-        value (float): Current progress value
-        total (float): Maximum progress value
-        size (int, optional): Width of the progress bar in characters. Defaults to 10.
-        char (str, optional): Character to use for filled portion. Defaults to "█".
-
-    Return:
-        str: A progress bar string like "██████    " representing the progress
-
-    Examples of use:
-        >>> import WizardCLI
-        >>> print(WizardCLI.strpercent(7, 10, size=10))
-        # Output: "███████   "
-        >>> print(WizardCLI.strpercent(5, 10, size=5, char="#"))
-        # Output: "##   "
-    """
-    assert total >= value > 0 and size > 0
-    percent = int((value / total) * size)
-    return "{}{}".format(percent*char, (size-percent)*" ")
-
-
-class EscapeSequence(str):
+class __EscapeSequence(str):
     ANSI_ESCAPE_PATTERN = recompile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
     def __init__(self, value: str = "") -> None:
         """A class to handle and iterate over ANSI escape sequences in strings..
@@ -850,54 +621,413 @@ class EscapeSequence(str):
         return self.nextchar()
 
 
+def fg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
+    """Convert text to fg text using ANSI escape codes.
+
+    Arguments:
+        color (Union[tuple, str, list, int], optional): Color in RGB tuple, hex string, or integer format. Defaults to None.
+
+    Return:
+        str: ANSI fg text string.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.fg("FF0000"))
+        >>> print(WizardCLI.fg((255, 0, 0)))
+        >>> print(WizardCLI.fg(0xFF0000))
+    """
+    if color is None:
+        return ""
+    if isinstance(color, int):
+        r = (color >> 16) & 0xFF
+        g = (color >> 8) & 0xFF
+        b = color & 0xFF
+        color = (r, g, b)
+    elif isinstance(color, str):
+        color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+    elif isinstance(color, (list, tuple)):
+        color = tuple(int(v) for v in color)
+    else:
+        raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
+    return "\033[38;2;{};{};{}m".format(int(color[0]), int(color[1]), int(color[2]))
+
+
+def bg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
+    """Returns the ANSI escape code for background text color.
+
+    Parameters:
+        color (Union[tuple, str, list, int], optional): RGB color value as tuple, hex string, or integer. Defaults to None.
+
+    Return:
+        str: ANSI escape code for background color formatting
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.bg(0x00FF00) + "Green background" + WizardCLI.rst())
+    """
+    if color is None:
+        return ""
+    if isinstance(color, int):
+        r = (color >> 16) & 0xFF
+        g = (color >> 8) & 0xFF
+        b = color & 0xFF
+        color = (r, g, b)
+    elif isinstance(color, str):
+        color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+    elif isinstance(color, (list, tuple)):
+        color = tuple(int(v) for v in color)
+    else:
+        raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
+    return "\033[48;2;{};{};{}m".format(int(color[0]), int(color[1]), int(color[2]))
+
+
 def rst() -> str:
-    """Returns the ANSI escape code to reset text formatting."""
+    """Returns the ANSI escape code to reset text formatting to default.
+
+    This function is used to reset any applied text formatting, such as colors, bold, italic, underline, etc., back to the terminal's default state.
+
+    Return:
+        str: ANSI escape code to reset text formatting.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.rst() + "Default text")
+    """
     return "\033[0m"
 
 
 def bld() -> str:
-    """Returns the ANSI escape code for bold text."""
+    """Returns the ANSI escape code for bold text formatting.
+
+    This function is used to apply bold styling to text in the terminal.
+
+    Return:
+        str: ANSI escape code for bold text.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.bld() + "Bold text" + WizardCLI.rst())
+    """
     return "\033[1m"
 
 
 def itl() -> str:
-    """Returns the ANSI escape code for italic text."""
+    """Returns the ANSI escape code for italic text formatting.
+
+    This function is used to apply italic styling to text in the terminal. Note that not all terminals support italic text.
+
+    Return:
+        str: ANSI escape code for italic text.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.itl() + "Italic text" + WizardCLI.rst())
+    """
     return "\033[3m"
 
 
 def und() -> str:
-    """Returns the ANSI escape code for underlined text."""
+    """Returns the ANSI escape code for underlined text formatting.
+
+    This function is used to underline text in the terminal.
+
+    Return:
+        str: ANSI escape code for underlined text.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.und() + "Underlined text" + WizardCLI.rst())
+    """
     return "\033[4m"
 
 
 def rev() -> str:
-    """Returns the ANSI escape code for reversed text color."""
+    """Returns the ANSI escape code for reversed text color formatting.
+
+    This function is used to swap the foreground and background colors of text in the terminal.
+
+    Return:
+        str: ANSI escape code for reversed text color.
+
+    Example of use:
+        >>> import WizardCLI
+        >>> print(WizardCLI.rev() + "Reversed text" + WizardCLI.rst())
+    """
     return "\033[7m"
 
 
 def strk() -> str:
-    """Returns the ANSI escape code for strikethrough text."""
-    return "\033[9m"
+    """Returns the ANSI escape code for strikethrough text formatting.
 
-def bg(text: str,
-       color: Union[tuple, str, list] = None,
-       reset: bool = True
-       ) -> str:
-    """Returns the ANSI escape code for foreground color.
-
-    Arguments:
-        color (Union[tuple, str]): Color in RGB tuple or hex string format.
+    This function is used to apply a strikethrough effect to text in the terminal. Note that not all terminals support strikethrough text.
 
     Return:
-        str: ANSI escape code for the specified foreground color.
+        str: ANSI escape code for strikethrough text.
 
     Example of use:
         >>> import WizardCLI
-        >>> print(WizardCLI.fg((255, 0, 0)))
-        >>> print(WizardCLI.fg("FF0000"))
+        >>> print(WizardCLI.strk() + "Strikethrough text" + WizardCLI.rst())
     """
-    if color is None:
-        return text
-    if reset:
-        return "\033[48;2;{};{};{}m{}\033[0m".format(color[0], color[1], color[2], text)
-    return "\033[48;2;{};{};{}m{}".format(color[0], color[1], color[2], text)
+    return "\033[9m"
+
+
+class benchmark:
+    def __init__(self, *args, repeat: Optional[int] = 1) -> None:
+        """
+        This object allows benchmarking of multiple functions.
+        It measures execution time (in nanoseconds) and memory usage (in bytes) for each 
+        registered function, using the same arguments and comparing them to a reference 
+        (the first added function).
+
+        Arguments:
+            *args: Positional arguments passed to all tested functions.
+            repeat (int, optional): Number of times each function is run to get an average. 
+                Defaults to 1.
+
+        Example of use:
+            >>> bench = benchmark(1000)
+            >>> bench.add(lambda x: [i for i in range(x)], alias="list")
+            >>> bench.add(lambda x: list(range(x)), alias="range")
+            >>> bench.run()
+        """
+        self.__funcs = []
+        self.__results = []
+        self.__threads = []
+        self.__repeat = repeat
+        self.__args = args
+
+    def add(self, func: Tcallable, alias: Optional[str] = None):
+        name = alias if alias else func.__name__
+        self.__funcs.append((func, name))
+
+    def __tests(self, index) -> None:
+        avg = 0
+        func, _ = self.__funcs[index]
+        for _ in range(self.__repeat):
+            start = perf_counter_ns()
+            out = func(*self.__args)
+            avg += perf_counter_ns() - start
+        avg /= self.__repeat
+        self.__results[index] = (avg, asizeof.asizeof(out))
+
+    def run(self) -> None:
+        if not self.__funcs:
+            print("Aucune fonction à tester.")
+            return
+
+        # ANSI color codes
+        GREEN = "\033[92m"
+        RED = "\033[91m"
+        YELLOW = "\033[93m"
+        RESET = "\033[0m"
+
+        ansi_escape = recompile(r'\x1b\[[0-9;]*m')
+        def strip_ansi(text: str) -> str:
+            return ansi_escape.sub('', text)
+
+        names = [name for _, name in self.__funcs]
+        metric_width = 20
+        results = [list() for _ in range(3)]
+
+        self.__results = [None] * len(self.__funcs)
+        self.__threads = []
+
+        for i in range(len(self.__funcs)):
+            t = Thread(target=self.__tests, args=(i,))
+            t.start()
+            self.__threads.append(t)
+
+        for t in self.__threads:
+            t.join()
+
+        times = [res[0] for res in self.__results]
+        sizes = [res[1] for res in self.__results]
+        ref_time, ref_size = times[0], sizes[0]
+
+        def colorize(values, ref_val, is_time=True):
+            best_val = min(values)
+            worst_val = max(values)
+            line = []
+            for i, val in enumerate(values):
+                if val == best_val:
+                    color = GREEN
+                elif val == worst_val:
+                    color = RED
+                else:
+                    color = YELLOW
+
+                if i == 0:
+                    text = f"{val:.0f}" if is_time else f"{val}"
+                else:
+                    base = f"{val:.0f}" if is_time else f"{val}"
+                    diff = ((ref_val - val) / ref_val) * 100 if ref_val else 0
+                    sign = "+" if diff > 0 else ""
+                    text = f"{base} ({sign}{diff:.2f}%)"
+                line.append(f"{color}{text}{RESET}")
+            return line
+
+        results[0] = names
+        results[1] = colorize(times, ref_time, is_time=True)
+        results[2] = colorize(sizes, ref_size, is_time=False)
+
+        col_widths = [max(len(strip_ansi(results[row][col])) for row in range(3)) for col in range(len(self.__funcs))]
+        total_width = metric_width + 1 + sum(w + 1 for w in col_widths)
+
+        def print_line():
+            print("-" * total_width)
+
+        def print_row(label, row_data):
+            row = f"{label:<{metric_width}}|"
+            for val, width in zip(row_data, col_widths):
+                padding = width - len(strip_ansi(val))
+                row += val + " " * padding + "|"
+            print(row)
+
+        title = f" Benchmark | Paramètres : {', '.join(map(str, self.__args))} "
+
+        print_line()
+        print(f"{title:^{total_width}}")
+        print_line()
+        print_row("Metric", results[0])
+        print_row("Time (ns)", results[1])
+        print_row("Size (bytes)", results[2])
+        print_line()
+
+
+@lru_cache(maxsize=256)
+def __RGBA(path: str, width: int, height: int) -> str:
+    result = []
+    last_color = None
+    append = result.append
+    for r, g, b, a in Image.open(path).resize((width, height), Image.Resampling.BILINEAR).getdata():
+        if a < 51:
+            append(" ")
+        elif a < 102:
+            if last_color == (r, g, b):
+                append("░")
+            else:
+                append(f"\033[38;2;{r};{g};{b}m░")
+                last_color = (r, g, b)
+        elif a < 153:
+            if last_color == (r, g, b):
+                append("▒")
+            else:
+                append(f"\033[38;2;{r};{g};{b}m▒")
+                last_color = (r, g, b)
+        elif a < 204:
+            if last_color == (r, g, b):
+                append("▓")
+            else:
+                append(f"\033[38;2;{r};{g};{b}m▓")
+                last_color = (r, g, b)
+        else:
+            if last_color == (r, g, b):
+                append("█")
+            else:
+                append(f"\033[38;2;{r};{g};{b}m█")
+                last_color = (r, g, b)
+    lines = ["".join(result[i:i+width]).rstrip(" ") for i in range(0, len(result), width)]
+    return "".join(("\n".join(lines), "\033[0m"))
+
+@lru_cache(maxsize=128)
+def __RGB(path: str, width: int, height: int, mode: bool = True) -> str:
+    result = []
+    last_color = None
+    append = result.append
+    if mode:
+            pixels = Image.open(path).resize((width, height), Image.Resampling.BILINEAR).getdata()
+    else:
+        pixels = Image.open(path).convert("RGB").resize((width, height), Image.Resampling.BILINEAR).getdata()
+    for r, g, b in pixels:
+        if last_color == (r, g, b):
+            append("█")
+        else:
+            append(f"\033[38;2;{r};{g};{b}m█")
+            last_color = (r, g, b)
+    lines = ["".join(result[i:i+width]) for i in range(0, len(result), width)]
+    return "".join(("\n".join(lines), "\033[0m"))
+
+@lru_cache(maxsize=32)
+def __P(path: str, width: int,  height: int) -> str:
+    result = []
+    last_color = None
+    append = result.append
+    for r, g, b, a in Image.open(path).convert("RGBA").resize((width, height), Image.Resampling.BILINEAR).getdata():
+        if not a:
+            append(" ")
+        if last_color == (r, g, b):
+            append("█")
+        else:
+            append(f"\033[38;2;{r};{g};{b}m█")
+            last_color = (r, g, b)
+    lines = ["".join(result[i:i+width]).rstrip(" ") for i in range(0, len(result), width)]
+    return "".join(("\n".join(lines), "\033[0m"))
+
+def strimg(path: str, width: Optional[int] = None, height: Optional[int] = None, termadj: Optional[bool] = False):
+    """
+        Converts an image into a colored text representation faithful to the original image.
+
+        Parameters:
+            path (str): Path to the image file.
+            width (Optional[int]): Desired output width. If None, calculated automatically.
+            height (Optional[int]): Desired output height. If None, calculated automatically.
+            termadj (Optional[bool]): If True, constrains output size to terminal dimensions.
+
+        Returns:
+            str: Colored text representation of the image.
+
+        Example of use:
+            result = strimg("image.png", width=80, termadj=True)
+    """
+    try:
+        img = Image.open(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Image file '{path}' not found.")
+    term_width, term_height = get_terminal_size(fallback=(80, 24))
+    img_ratio = (img.width / img.height) * 1.8
+
+    if width is None and height is None:
+        if img_ratio < 1:
+            width = term_width
+            height = width / img_ratio
+        elif img_ratio > 1:
+            height = term_height
+            width = height * img_ratio
+        else:
+            width = term_width
+            height = term_height * 1.8
+    elif width is None:
+        width = height * img_ratio
+    elif height is None:
+        height = width / img_ratio
+    else:
+        if width / height > img_ratio:
+            height = width / img_ratio
+        else:
+            width = height * img_ratio
+
+    if termadj:
+        if width > term_width:
+            if img_ratio < 1:
+                width = term_width
+                height = width / img_ratio
+            else:
+                height = term_height
+                width = height * img_ratio
+        if height > term_height:
+            if img_ratio < 1:
+                height = term_height
+                width = height * img_ratio
+            else:
+                width = term_width
+                height = width / img_ratio
+    width = round(width)
+    height = round(height)
+    if img.mode == "RGBA":
+        return __RGBA(path, width, height)
+    elif img.mode == "P":
+        return __P(path, width, height)
+    elif img.mode == "RGB":
+        return __RGB(path, width, height, True)
+    else:
+        return __RGB(path, width, height, False)
