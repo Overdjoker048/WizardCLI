@@ -1,7 +1,7 @@
 # WizardCLI
 ![Python Version](https://img.shields.io/badge/Python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Version](https://img.shields.io/badge/Version-1.3.5-yellow)
+![Version](https://img.shields.io/badge/Version-1.4.0-yellow)
 
 A simple and efficient command-line tool written in Python.
 
@@ -9,26 +9,22 @@ A simple and efficient command-line tool written in Python.
 
 WizardCLI is a command-line utility that provides a powerful framework for creating interactive CLI applications. It features:
 
-- Progressive text display with customizable animation speed
 - Colored text output support (RGB and HEX)
-- Command history and logging capabilities
 - Built-in file management utilities
-- Loading animations and progress bars
 - Memory usage tracking
+- Comparisons of method effectiveness
 - Execution time measurement
 - Gradient text effects
-
+- Image conversion to ascii
+- 
 ## Key Features
 
 - **Easy Command Creation**: Create new commands with simple decorators
 - **Type Safety**: Built-in type checking for command arguments
 - **Documentation**: Automatic help generation for commands
-- **Customization**: Configurable prompt, colors, and animations
 - **File Operations**: Integrated file handling with encoding support
-- **Visual Feedback**: Progress indicators and loading animations
-- **Development Tools**: Memory tracking and execution time measurement
-- **Text Effects**: Bold, italics, underline, reverse, and strikethrough text effects
-- **Escape Sequences**: Handling and iterating over ANSI escape sequences
+- **Development Tools**: Memory tracking, execution time measurement and methode comparaison
+- **Text Effects**: Bold, italics, underline, reverse, background color, forground color, and strikethrough text effects
 
 ## Quick Exemple Usage
 ```python
@@ -54,3 +50,5 @@ def hello(name: str = "World"):
 cli.run()
 ```
 
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.

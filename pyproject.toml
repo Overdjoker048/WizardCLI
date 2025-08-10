@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "WizardCLI"
-version = "1.3.5"
-description = "A simple and efficient command-line tool written in Python"
+version = "1.4.0"
+description = "A simple and efficient CLI tool written in Python"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -26,6 +26,7 @@ dev = [
 ]
 
 [project.dependencies]
+pillow = "*"
 colorama = "*"
 Pympler = "*"
 pywin32 = "*"

@@ -6,7 +6,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="WizardCLI",
-    version="1.3.5",
+    version="1.4.0",
     long_description=long_description,
     long_description_content_type="text/markdown",
     description="A simple and efficient command-line tool written in Python",
@@ -15,7 +15,7 @@ setup(
     url="https://github.com/Overdjoker048/WizardCLI",
     packages=find_packages(),
     install_requires=[
-        "colorama", "Pympler", "pywin32"
+        "colorama", "Pympler", "pywin32", "pillow"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
