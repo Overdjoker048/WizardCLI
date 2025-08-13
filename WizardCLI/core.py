@@ -21,16 +21,16 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 __all__ = [
-    'CLI', 'gradiant', 'gram', 'benchmark', 
+    'CLI', 'gradiant', 'gram', 'Benchmark',
     'File', 'optional', 'exectime', 'fg', 
     'bg', 'rst', 'itl', 'und', 'rev', 'strk',
     'bld', 'strimg'
 ]
 
 from os import path as ospath, name, kill, getpid, stat, rename
-from typing import Union, Callable as Tcallable, Optional
+from typing import Union, Optional
 from time import perf_counter_ns
 from colorama import init
 from inspect import Signature, signature, stack
@@ -38,7 +38,7 @@ from shlex import split as splitS
 from functools import wraps, lru_cache
 from pympler import asizeof
 from threading import Thread
-from re import compile as recompile
+from re import compile as recompile, split, sub
 from shutil import move, get_terminal_size
 from PIL import Image
 
@@ -49,7 +49,7 @@ class CLI:
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
-                 formating: str = ""
+                 formating: str = "{}"
                  ) -> None:
         """This object allows the creation of the CLI.
 
@@ -71,7 +71,7 @@ class CLI:
         self.prompt: str = prompt
         self.user: str = user
         self.path: str = CLI.home
-        self.format: str = formating
+        self.format: str = formating.format
         self.command(alias=["?"], doc=self.help.__doc__)(self.help)
         self.command(alias=["cls" if name == 'nt' else "clear"], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
         self.command(alias=["exit"], doc=self.leave.__doc__)(self.leave)
@@ -84,7 +84,7 @@ class CLI:
                 name: Optional[str] = None,
                 doc: Optional[str] = None,
                 alias : list = []
-                ) -> Tcallable:
+                ) -> callable:
         """The command decorator allows you to define a function as a command for the CLI.
 
         Arguments:
@@ -103,8 +103,8 @@ class CLI:
             ...    print("Hello World")
             >>> cli.run()
         """
-        def decorator(func: callable) -> Tcallable:
-            def wrapper(name: str, doc: str, alias: list[str]) -> None:
+        def decorator(func: callable) -> callable:
+            def wrapper(name: str, doc: str, alias: list) -> None:
                 if doc is None:
                     doc = ""
                 data = {"function": func}
@@ -112,11 +112,11 @@ class CLI:
                 args, options, params = [], [], {}
                 for arg_name, arg_info in args_info:
                     if arg_info.default == Signature.empty:
-                        args.append(("[{}]".format(arg_name), arg_info.annotation))
+                        args.append((f"[{arg_name}]", arg_info.annotation))
                     elif arg_info.default is True:
-                        options.append("-{}".format(arg_name))
+                        options.append(f"-{arg_name}")
                     else:
-                        params["--{}".format(arg_name)] = (arg_info.annotation, arg_info.default)
+                        params[f"--{arg_name}"] = (arg_info.annotation, arg_info.default)
                 if doc != "":
                     data["doc"] = doc
                 if args != []:
@@ -166,14 +166,13 @@ class CLI:
                 la = max(la, cmds[name]["la"][1])
                 lap = max(lap, cmds[name]["lap"][1])
         if m:
-            lines = ["Alias  {} -> {} {}".format(cmds[cmd]['la'][0]+(la-cmds[cmd]['la'][1])*' ', cmds[cmd]['lap'][0]+(lap-cmds[cmd]['lap'][1])*' ',cmds[cmd]['doc']) for cmd in sorted(cmds)]
+            lines = [f"Alias  {cmds[cmd]['la'][0]+(la-cmds[cmd]['la'][1])*' '} -> {cmds[cmd]['lap'][0]+(lap-cmds[cmd]['lap'][1])*' '} {cmds[cmd]['doc']}" for cmd in sorted(cmds)]
         else:
-            lines = ["{} - {}".format(cmd, cmds[cmd]['doc']) for cmd in sorted(cmds)]
+            lines = [f"{cmd} - {cmds[cmd]['doc']}" for cmd in sorted(cmds)]
         max_length = max(len(line.split(" - ")[0]) for line in lines) if not m else 0
         if not m:
-            lines = ["{} {}".format(cmd.ljust(max_length), cmds[cmd]['doc']) for cmd in sorted(cmds)]
-        text = "\n".join(lines)
-        print(fg(text, self.color))
+            lines = [f"{cmd.ljust(max_length)} {cmds[cmd]['doc']}" for cmd in sorted(cmds)]
+        print(self.format("\n".join(lines)))
 
     def change_directory(self, path: str) -> None:
         "Allows you to change the location of the terminal in your files."
@@ -185,7 +184,7 @@ class CLI:
         if ospath.isdir(path):
             self.path = str(path).title()
         else:
-            print(fg("The path is invalid.", self.color))
+            print(self.format("The path is invalid."))
 
     def __decode(self, tpe: object, value: any) -> object:
         "Format arguments in the types chosen when creating commands."
@@ -198,31 +197,32 @@ class CLI:
 
     def __info(self, name: str, data: dict) -> str:
         "Creates the information message for the commands to add in the cli."
-        usage = "\nUsage: {}".format(name)
+        usage = f"\nUsage: {name}"
         txt = ""
         for i in data:
             if i == "doc":
-                txt += "\nDocumentation: {}".format(data[i])
+                txt += f"\nDocumentation: {data[i]}"
             elif i == "args":
                 txt += "\nArgument(s):"
                 for j in data["args"]:
-                    usage += " {}".format(j[0])
-                    txt += "\n    {}: {}".format(j[0].replace("[", "").replace("]", ""), str(j[1]).replace("<class '", "").replace("'>", ""))
+                    usage += f" {j[0]}"
+                    tp = str(j[1]).replace("<class '", "").replace("'>", "")
+                    txt += f"\n    {j[0].replace('[', '').replace(']', '')}: {tp}"
             elif i == "params":
                 txt += "\nParameter(s):"
                 for j in data["params"]:
-                    usage += " {}".format(j)
+                    usage += f" {j}"
                     tpe = str(data['params'][j][0]).replace("<class '", "").replace("'>", "")
                     if tpe == "None":
                         tpe = ""
                     else:
                         tpe = ": " + tpe
-                    txt += "\n    {}{} = {}".format(j, tpe, data['params'][j][1])
+                    txt += f"\n    {j}{tpe} = {data['params'][j][1]}"
             elif i == "options":
                 txt += "\nOption(s):"
                 for j in data["options"]:
-                    usage += " {}".format(j)
-                txt += " {}".format(j)
+                    usage += f" {j}"
+                txt += f" {j}"
             elif i == "alias":
                 txt += "\nAlias: "
                 txt += ", ".join(data["alias"])
@@ -242,7 +242,7 @@ class CLI:
             if arg.startswith("--"):
                 value = cmd["params"].get(arg)
                 if value is None:
-                    print(fg("Unknown Parameter", self.color))
+                    print(self.format("Unknown Parameter"))
                     do = True
                     break
                 kwargs[arg[2:]] = None if index + 1 >= len(entry) else self.__decode(value[0], entry[index + 1])
@@ -253,10 +253,10 @@ class CLI:
                 else:
                     if arg == "-?":
                         do = True
-                        print(fg(cmd["info"], self.color))
+                        print(self.format(cmd["info"]))
                         break
                     else:
-                        print(fg("Unknown Option", self.color))
+                        print(self.format("Unknown Option"))
                         do = True
                         break
             else:
@@ -264,7 +264,7 @@ class CLI:
                     kwargs[cmd["args"][arg_i][0].strip("[]")] = self.__decode(cmd["args"][arg_i][1], arg)
                     arg_i += 1
                 else:
-                    print(fg("Too many arguments provided.", self.color))
+                    print(self.format("Too many arguments provided."))
                     do = True
                     break
             index += 1
@@ -280,7 +280,7 @@ class CLI:
                     continue
                 cmd = self.__cmd.get(entry[0].lower())
                 if cmd is None:
-                    print(fg("{} doesn't exist.\nDo help to get the list of existing commands.".format(entry[0]), self.color))
+                    print(self.format(f"{entry[0]} doesn't exist.\nDo help to get the list of existing commands."))
                     continue
                 if isinstance(cmd, str):
                     cmd = self.__cmd[cmd]
@@ -288,40 +288,76 @@ class CLI:
             except KeyboardInterrupt:
                 kill(getpid(), 9)
             except Exception as e:
-                print(fg("An unexpected error occurred: {}".format(e), self.color))
+                print(self.format(f"An unexpected error occurred: {e}"))
 
 
 def gradiant(
     text: str,
-    start: Union[tuple, str, list],
-    end: Union[tuple, str, list],
+    start: Union[tuple, str, list, int],
+    end: Union[tuple, str, list, int],
     sep: Optional[str] = ""
-    ) -> str:
+) -> str:
     """Create text with color gradient effect while preserving existing styles.
 
     Arguments:
         text (str): Text to apply gradient to.
-        start (Union[tuple, str]): Starting color in RGB tuple or hex format.
-        end (Union[tuple, str]): Ending color in RGB tuple or hex format.
+        start (Union[tuple, str, list]): Starting color in RGB tuple or hex format.
+        end (Union[tuple, str, list]): Ending color in RGB tuple or hex format.
         sep (str, optional): Separator for splitting text into segments.
 
     Return:
         str: Text with color gradient applied, preserving styles.
     """
-    start_rgb = list(fg(start))
-    end_rgb = fg(end)
-    segments = [char for char in __EscapeSequence(text)] if sep == "" else str(text).split(sep)
-    steps = max(len(segments) - 1, 1)
-    diffs = [(end_rgb[i] - start_rgb[i]) / steps for i in range(3)]
-    return "".join(
-        fg(
-            [int(start_rgb[j] + diffs[j] * i) for j in range(3)]
-        ) + segment for i, segment in enumerate(segments)
-    ) + "\033[0m"
+    def parse_color(c):
+        if isinstance(c, (list, tuple)) and len(c) == 3:
+            return c
+        elif isinstance(c, int):
+            return ((c >> 16) & 255, (c >> 8) & 255, c & 255)
+        elif isinstance(c, str):
+            return tuple(int(c[i:i+2], 16) for i in (0, 2, 4))
+        ValueError(f"Invalid color: {c}")
+
+    ANSI_PATTERN = recompile(r"\x1b\[[0-9;]*m")
+    start_rgb = parse_color(start)
+    end_rgb = parse_color(end)
+
+    def apply_gradient(segment: str, start_offset: float = 0.0, global_len: Optional[int] = None, global_pos: int = 0) -> str:
+        parts = split(r"(\x1b\[[0-9;]*m)", segment)
+        clean_len = sum(len(p) for i, p in enumerate(parts) if i % 2 == 0)
+        denom = max(1, (global_len if global_len is not None else clean_len) - 1)
+
+        out = []
+        visible_idx = 0
+        for i, p in enumerate(parts):
+            if i % 2 == 1:
+                out.append(p)
+            else:
+                for ch in p:
+                    idx = global_pos + visible_idx
+                    if idx == denom:
+                        out.append(f"\033[38;2;{end_rgb[0]};{end_rgb[1]};{end_rgb[2]}m{ch}")
+                    else:
+                        f = (idx / denom) + start_offset
+                        out.append(f"\033[38;2;{int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * f)};{int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * f)};{int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * f)}m{ch}")
+                    visible_idx += 1
+        return "".join(out)
+
+    if sep:
+        segments = text.split(sep)
+        total_len = sum(len(sub(ANSI_PATTERN, "", seg)) for seg in segments)
+        pos = 0
+        colored_segments = []
+        for seg in segments:
+            colored_segments.append(apply_gradient(seg, 0.0, global_len=total_len, global_pos=pos))
+            pos += len(sub(ANSI_PATTERN, "", seg))
+        return sep.join(colored_segments) + "\033[0m"
+    else:
+        return apply_gradient(text) + "\033[0m"
 
 
 def gram() -> tuple:
-    """Display memory usage of the program.
+    """
+    Display memory usage of the program.
 
     Return:
         tuple: A tuple containing:
@@ -341,7 +377,7 @@ def gram() -> tuple:
         imemory = asizeof.asizeof(frame[index])
         memory[index] = (type(frame[index]), imemory)
         gmemory += imemory
-    return (gmemory, memory)
+    return gmemory, memory
 
 
 def exectime(repeat: Optional[int] = 1):
@@ -359,7 +395,7 @@ def exectime(repeat: Optional[int] = 1):
             >>> def hello_world():
             ...    print("Hello World")
         """
-    def decorator(func: callable) -> Tcallable:
+    def decorator(func: callable) -> callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> tuple:
             avg = 0
@@ -383,7 +419,7 @@ def optional(*defaults):
         >>> def hello_world(name):
         ...     print("Hello", name)
     """
-    def decorator(func: callable) -> Tcallable:
+    def decorator(func: callable) -> callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> any:
             for i, (param_name, _) in enumerate(signature(func).parameters.items()):
@@ -452,34 +488,34 @@ class File:
         return self.__binary
 
     def __repr__(self) -> str:
-        """Returns a string representation of the file."""
-        return "file(path='{}', encoding='{}')".format(self.name+self.extention, self.__encoding)
+        "Returns a string representation of the file."
+        return f"file(path='{self.name}{self.extention}', encoding='{self.__encoding}')"
 
     def split(self, sep: str="\n", maxsplit: int = -1):
-        """Splits the file into lines."""
+        "Splits the file into lines."
         return self.__str__().split(sep, maxsplit)
 
     def __bool__(self) -> bool:
-        """Returns True if the file is not empty."""
+        "Returns True if the file is not empty."
         return bool(self.__binary)
 
     def __len__(self) -> int:
-        """Returns the length of the file."""
+        "Returns the length of the file."
         return len(self.__binary)
 
     def __eq__(self, other: object) -> bool:
-        """Compares two files."""
+        "Compares two files."
         if isinstance(other, File):
             return self.path == other.path and self.__data == other.__data
         return False
 
-    def __iter__(self) -> Tcallable:
-        """Returns an iterator for the file."""
+    def __iter__(self) -> callable:
+        "Returns an iterator for the file."
         self.index = 0
         return self
 
     def __next__(self) -> Union[str, StopIteration]:
-        """Returns the next line in the file."""
+        "Returns the next line in the file."
         if self.index < len(self.__lines):
             line = self.__lines[self.index]
             self.index += 1
@@ -488,19 +524,19 @@ class File:
             raise StopIteration
 
     def __sub__(self, index: int) -> None:
-        """Removes data from the file by subtracting bytes from the end."""
+        "Removes data from the file by subtracting bytes from the end."
         if index < self.__len__():
             self.__binary = self.__binary[:-index]
             self.__newt(self.__write, self.__binary, "wb")
         return self
 
     def __add__(self, value: any) -> None:
-        """Adds data to the file by appending it."""
+        "Adds data to the file by appending it."
         self.append(value)
         return self
 
     def append(self, data: Union[str, bytes]) -> None:
-        """Appends data to the file."""
+        "Appends data to the file."
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
@@ -509,31 +545,31 @@ class File:
         self.__newt(self.__write, data, "ab")
 
     def clear(self) -> None:
-        """Clears the content of the file."""
+        "Clears the content of the file."
         self.__newt(self.__write, "", "wb")
 
     def rename(self, name: str) -> None:
-        """Renames the file to the specified name."""
+        "Renames the file to the specified name."
         self.__newt(rename, self.path+self.name+self.extention, self.path+name+self.extention)
         self.name = name
 
     def move(self, path: str) -> None:
-        """Moves the file to the specified path."""
+        "Moves the file to the specified path."
         self.__newt(move, path+self.name+self.extention)
         self.path = path
 
     def find(self, value: str) -> int:
-        """Finds the index of the first occurrence of a value in the file."""
+        "Finds the index of the first occurrence of a value in the file."
         return self.__str__().find(value)
 
     def drop(self, value: str) -> None:
-        """Removes the first occurrence of a value from the file."""
+        "Removes the first occurrence of a value from the file."
         content = self.__str__().replace(value, "", 1)
         self.__binary = content.encode(self.__encoding)
         self.__newt(self.__write, self.__binary, "wb")
 
     def insert(self, index: int, data: Union[str, bytes]) -> None:
-        """Inserts data into the file at the specified index."""
+        "Inserts data into the file at the specified index."
         if isinstance(data, str):
             data = data.encode(self.__encoding)
         elif not isinstance(data, bytes):
@@ -544,11 +580,11 @@ class File:
         self.__newt(self.__write, self.__binary, "wb")
 
     def __write(self, path: str, data: bytes, method: str = "wb") -> None:
-        """Writes binary data to the file at the specified path."""
+        "Writes binary data to the file at the specified path."
         open(path, method).write(data)
 
     def __newt(self, func: callable, *args) -> None:
-        """Schedules a task to be executed in a separate thread."""
+        "Schedules a task to be executed in a separate thread."
         if func == rename:
             self.__tasks["rename"] = (func, args)
         elif func == move:
@@ -559,7 +595,7 @@ class File:
             else:
                 self.__tasks["write"].append((func, args))
         if not self.__running:
-            Thread(target=self.__run).start()
+            self.__thread = Thread(target=self.__run).start()
 
     def __run(self) -> None:
         """Executes all scheduled tasks in a separate thread."""
@@ -575,54 +611,9 @@ class File:
         self.__running = False
 
 
-class __EscapeSequence(str):
-    ANSI_ESCAPE_PATTERN = recompile(r'(\033\[[0-9;?]*[a-zA-Z]|\033\[38;2;[0-9]{1,3};[0-9]{1,3};[0-9]{1,3}m|\n|\r|\t)')
-    def __init__(self, value: str = "") -> None:
-        """A class to handle and iterate over ANSI escape sequences in strings..
-
-        Argument:
-            value (str): The string value to initialize the EscapeSequence object with. Defaults to an empty string.
-
-        Example of use:
-            >>> import WizardCLI
-            >>> esc_seq = WizardCLI.EscapeSequence("\033[31mHello\033[0m")
-        """
-        super().__init__()
-        if not isinstance(value, str):
-            self.value = "".join(map(str, value))
-        else:
-            self.value = value
-
-    def __repr__(self) -> str:
-        """Returns a string representation of the EscapeSequence object."""
-        return "EscapeSequence(value='{}')".format(self.value)
-
-    def __iter__(self) -> Tcallable:
-        """Returns an iterator for the EscapeSequence object."""
-        self.index = 0
-        return self
-
-    def nextchar(self) -> str:
-        """Returns the next character or escape sequence in the string."""
-        match = self.ANSI_ESCAPE_PATTERN.match(self.value, self.index)
-        if match:
-            seq = match.group()
-            self.index = match.end()
-            if self.index < len(self.value):
-                return seq + self.nextchar()
-            return seq
-        self.index += 1
-        return self.value[self.index - 1]
-
-    def __next__(self) -> str:
-        """Returns the next character or escape sequence in the string, raises StopIteration when done."""
-        if self.index >= len(self.value):
-            raise StopIteration
-        return self.nextchar()
-
-
 def fg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
-    """Convert text to fg text using ANSI escape codes.
+    """
+    Returns the ANSI escape code for forground text color.
 
     Arguments:
         color (Union[tuple, str, list, int], optional): Color in RGB tuple, hex string, or integer format. Defaults to None.
@@ -632,28 +623,24 @@ def fg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
 
     Example of use:
         >>> import WizardCLI
-        >>> print(WizardCLI.fg("FF0000"))
-        >>> print(WizardCLI.fg((255, 0, 0)))
-        >>> print(WizardCLI.fg(0xFF0000))
+        >>> print(WizardCLI.fg("FF0000") + "Red background" + WizardCLI.rst())
+        >>> print(WizardCLI.fg((255, 0, 0)) + "Red background" + WizardCLI.rst())
+        >>> print(WizardCLI.fg(0xFF0000) + "Red background" + WizardCLI.rst())
     """
     if color is None:
         return ""
     if isinstance(color, int):
-        r = (color >> 16) & 0xFF
-        g = (color >> 8) & 0xFF
-        b = color & 0xFF
-        color = (r, g, b)
+        return f"\033[38;2;{(color >> 16) & 255};{(color >> 8) & 255};{color & 255}m"
     elif isinstance(color, str):
-        color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
-    elif isinstance(color, (list, tuple)):
-        color = tuple(int(v) for v in color)
-    else:
-        raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
-    return "\033[38;2;{};{};{}m".format(int(color[0]), int(color[1]), int(color[2]))
+        return f"\033[38;2;{int(color[0:2], 16)};{int(color[2:4], 16)};{int(color[4:6], 16)}m"
+    elif isinstance(color, (list, tuple)) and len(color) == 3:
+        return f"\033[38;2;{color[0]};{color[1]};{color[2]}m"
+    raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
 
 
 def bg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
-    """Returns the ANSI escape code for background text color.
+    """
+    Returns the ANSI escape code for background text color.
 
     Parameters:
         color (Union[tuple, str, list, int], optional): RGB color value as tuple, hex string, or integer. Defaults to None.
@@ -663,22 +650,19 @@ def bg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
 
     Example of use:
         >>> import WizardCLI
-        >>> print(WizardCLI.bg(0x00FF00) + "Green background" + WizardCLI.rst())
+        >>> print(WizardCLI.bg("FF0000") + "Red background" + WizardCLI.rst())
+        >>> print(WizardCLI.bg((255, 0, 0)) + "Red background" + WizardCLI.rst())
+        >>> print(WizardCLI.bg(0xFF0000) + "Red background" + WizardCLI.rst())
     """
     if color is None:
         return ""
     if isinstance(color, int):
-        r = (color >> 16) & 0xFF
-        g = (color >> 8) & 0xFF
-        b = color & 0xFF
-        color = (r, g, b)
+        return f"\033[48;2;{(color>>16)&255};{(color>>8)&255};{color&255}m"
     elif isinstance(color, str):
-        color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
-    elif isinstance(color, (list, tuple)):
-        color = tuple(int(v) for v in color)
-    else:
-        raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
-    return "\033[48;2;{};{};{}m".format(int(color[0]), int(color[1]), int(color[2]))
+        return f"\033[48;2;{int(color[0:2],16)};{int(color[2:4],16)};{int(color[4:6],16)}m"
+    elif isinstance(color, (list, tuple)) and len(color) == 3:
+        return f"\033[48;2;{color[0]};{color[1]};{color[2]}m"
+    raise TypeError("Invalid color format. Expected tuple, list, string, or int string.")
 
 
 def rst() -> str:
@@ -771,7 +755,7 @@ def strk() -> str:
     return "\033[9m"
 
 
-class benchmark:
+class Benchmark:
     def __init__(self, *args, repeat: Optional[int] = 1) -> None:
         """
         This object allows benchmarking of multiple functions.
@@ -796,7 +780,7 @@ class benchmark:
         self.__repeat = repeat
         self.__args = args
 
-    def add(self, func: Tcallable, alias: Optional[str] = None):
+    def add(self, func: callable, alias: Optional[str] = None) -> None:
         name = alias if alias else func.__name__
         self.__funcs.append((func, name))
 
@@ -815,18 +799,11 @@ class benchmark:
             print("Aucune fonction à tester.")
             return
 
-        # ANSI color codes
-        GREEN = "\033[92m"
-        RED = "\033[91m"
-        YELLOW = "\033[93m"
-        RESET = "\033[0m"
-
-        ansi_escape = recompile(r'\x1b\[[0-9;]*m')
+        ansi_escape = recompile(r'\033\[[0-9;]*m')
         def strip_ansi(text: str) -> str:
             return ansi_escape.sub('', text)
 
         names = [name for _, name in self.__funcs]
-        metric_width = 20
         results = [list() for _ in range(3)]
 
         self.__results = [None] * len(self.__funcs)
@@ -850,11 +827,11 @@ class benchmark:
             line = []
             for i, val in enumerate(values):
                 if val == best_val:
-                    color = GREEN
+                    color = "\033[92m"
                 elif val == worst_val:
-                    color = RED
+                    color = "\033[91m"
                 else:
-                    color = YELLOW
+                    color = "\033[93m"
 
                 if i == 0:
                     text = f"{val:.0f}" if is_time else f"{val}"
@@ -863,7 +840,7 @@ class benchmark:
                     diff = ((ref_val - val) / ref_val) * 100 if ref_val else 0
                     sign = "+" if diff > 0 else ""
                     text = f"{base} ({sign}{diff:.2f}%)"
-                line.append(f"{color}{text}{RESET}")
+                line.append(f"{color}{text}\033[0m")
             return line
 
         results[0] = names
@@ -871,13 +848,10 @@ class benchmark:
         results[2] = colorize(sizes, ref_size, is_time=False)
 
         col_widths = [max(len(strip_ansi(results[row][col])) for row in range(3)) for col in range(len(self.__funcs))]
-        total_width = metric_width + 1 + sum(w + 1 for w in col_widths)
+        total_width = 20 + 1 + sum(w + 1 for w in col_widths)
 
-        def print_line():
-            print("-" * total_width)
-
-        def print_row(label, row_data):
-            row = f"{label:<{metric_width}}|"
+        def print_row(label, row_data) -> None:
+            row = f"{label:<{20}}|"
             for val, width in zip(row_data, col_widths):
                 padding = width - len(strip_ansi(val))
                 row += val + " " * padding + "|"
@@ -885,17 +859,18 @@ class benchmark:
 
         title = f" Benchmark | Paramètres : {', '.join(map(str, self.__args))} "
 
-        print_line()
+        print("-" * total_width)
         print(f"{title:^{total_width}}")
-        print_line()
+        print("-" * total_width)
         print_row("Metric", results[0])
         print_row("Time (ns)", results[1])
         print_row("Size (bytes)", results[2])
-        print_line()
+        print("-" * total_width)
 
 
 @lru_cache(maxsize=256)
 def __RGBA(path: str, width: int, height: int) -> str:
+    """Converts an image to colored ASCII with alpha channel management."""
     result = []
     last_color = None
     append = result.append
@@ -931,6 +906,7 @@ def __RGBA(path: str, width: int, height: int) -> str:
 
 @lru_cache(maxsize=128)
 def __RGB(path: str, width: int, height: int, mode: bool = True) -> str:
+    """Converts an image to colored ASCII without alpha channel management."""
     result = []
     last_color = None
     append = result.append
@@ -940,15 +916,16 @@ def __RGB(path: str, width: int, height: int, mode: bool = True) -> str:
         pixels = Image.open(path).convert("RGB").resize((width, height), Image.Resampling.BILINEAR).getdata()
     for r, g, b in pixels:
         if last_color == (r, g, b):
-            append("█")
+            append(" ")
         else:
-            append(f"\033[38;2;{r};{g};{b}m█")
+            append(f"\033[48;2;{r};{g};{b}m ")
             last_color = (r, g, b)
     lines = ["".join(result[i:i+width]) for i in range(0, len(result), width)]
     return "".join(("\n".join(lines), "\033[0m"))
 
 @lru_cache(maxsize=32)
 def __P(path: str, width: int,  height: int) -> str:
+    """Converts an image to colored ASCII with transparency handling."""
     result = []
     last_color = None
     append = result.append
@@ -958,12 +935,12 @@ def __P(path: str, width: int,  height: int) -> str:
         if last_color == (r, g, b):
             append("█")
         else:
-            append(f"\033[38;2;{r};{g};{b}m█")
+            append(f"\033[48;2;{r};{g};{b}m█")
             last_color = (r, g, b)
     lines = ["".join(result[i:i+width]).rstrip(" ") for i in range(0, len(result), width)]
     return "".join(("\n".join(lines), "\033[0m"))
 
-def strimg(path: str, width: Optional[int] = None, height: Optional[int] = None, termadj: Optional[bool] = False):
+def strimg(path: str, width: Optional[int] = None, height: Optional[int] = None, termadj: Optional[bool] = False) -> str:
     """
         Converts an image into a colored text representation faithful to the original image.
 
