@@ -1,6 +1,7 @@
 # WizardCLI
+![Python Version](https://img.shields.io/badge/Python-3.6+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Version](https://img.shields.io/badge/Version-1.4.0-yellow)
+![Version](https://img.shields.io/badge/Version-1.4.1-yellow)
 
 A simple and efficient command-line tool written in Python.
 
@@ -14,7 +15,7 @@ WizardCLI is a command-line utility that provides a powerful framework for creat
 - Comparisons of method effectiveness
 - Execution time measurement
 - Gradient text effects
-- Image conversion to ascii
+- Image conversion to ASCII
 - 
 ## Key Features
 
@@ -33,10 +34,7 @@ import WizardCLI
 cli = WizardCLI.CLI(
     prompt="[{}]@[{}]\\>", # Customizable prompt
     user="MyApp", # Username in prompt
-    logs=True, # Enable logging
-    anim=True, # Enable text animation
-    cool=0.1, # Animation speed
-    color=(255,0,0) # Text color (RGB)
+    formating="\033[38;2;255;0;0m{}\033[0m" #Customizable text
 )
 
 # Create a simple command

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "WizardCLI"
-version = "1.4.0"
+version = "1.4.1"
 description = "A simple and efficient CLI tool written in Python"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ authors = [
     { name = "Overdjoker048", email = "overdrawdescartes@gmail.com" }
 ]
 homepage = "https://github.com/Overdjoker048/WizardCLI"
-requires-python = ">=3.7"
+requires-python = ">=3.6"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

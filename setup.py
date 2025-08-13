@@ -6,7 +6,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="WizardCLI",
-    version="1.4.0",
+    version="1.4.1",
     long_description=long_description,
     long_description_content_type="text/markdown",
     description="A simple and efficient command-line tool written in Python",
@@ -22,5 +22,5 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.6",
 )
