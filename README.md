@@ -16,7 +16,6 @@ WizardCLI is a command-line utility that provides a powerful framework for creat
 - Execution time measurement
 - Gradient text effects
 - Image conversion to ASCII
-- 
 ## Key Features
 
 - **Easy Command Creation**: Create new commands with simple decorators
