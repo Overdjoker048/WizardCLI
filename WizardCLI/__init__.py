@@ -10,7 +10,7 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.4.1'
+__version__ = '1.5.0'
 __all__ = [
     'CLI', 'gradiant', 'gram', 'Benchmark', 'File',
     'optional', 'exectime', 'fg', 'bg' 'rst', 'itl',

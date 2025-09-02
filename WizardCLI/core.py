@@ -21,31 +21,31 @@ __title__ = 'WizardCLI'
 __author__ = 'Overdjoker048'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2023-2025 Overdjoker048'
-__version__ = '1.4.1'
-__all__ = [
+__version__ = '1.5.0'
+__all__ = (
     'CLI', 'gradiant', 'gram', 'Benchmark',
     'File', 'optional', 'exectime', 'fg', 
     'bg', 'rst', 'itl', 'und', 'rev', 'strk',
     'bld', 'strimg'
-]
+)
 
 from os import path as ospath, name, kill, getpid, stat, rename
 from typing import Union, Optional
-from time import perf_counter_ns
+from time import perf_counter_ns, sleep
 from colorama import init
 from inspect import Signature, signature, stack
 from shlex import split as splitS
 from functools import wraps, lru_cache
 from pympler import asizeof
-from threading import Thread
+from threading import Thread, Lock
 from re import compile as recompile, split, sub
-from shutil import move, get_terminal_size
+from shutil import move, get_terminal_size, copy2
 from PIL import Image
 
 init()
 
 class CLI:
-    home = ospath.dirname(__file__)
+    __slots__ = ('__cmd', '__prompt', 'user', '__path', '__strformat', '__allow_cmd')
     def __init__(self,
                  prompt: str = "[{}]@[{}]\\>",
                  user: str = "Python-Cli",
@@ -67,18 +67,55 @@ class CLI:
             >>> cli.run()
         """
 
-        self.__cmd: dict = {}
-        self.prompt: str = prompt
-        self.user: str = user
-        self.path: str = CLI.home
-        self.format: str = formating.format
-        self.command(alias=["?"], doc=self.help.__doc__)(self.help)
-        self.command(alias=["cls" if name == 'nt' else "clear"], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
-        self.command(alias=["exit"], doc=self.leave.__doc__)(self.leave)
-        @self.command(alias=["cd"], doc=self.change_directory.__doc__)
-        @optional(CLI.home)
-        def change_directory(path) -> None:
-            self.change_directory(path)
+        self.__cmd = {}
+        self.__prompt = prompt
+        self.user = user
+        self.__path = ospath.dirname(__file__)
+        self.__strformat = formating.format
+        self.__allow_cmd = {
+            "help": True,
+            "leave": True,
+            "clear_host": True,
+            "change_directory": True
+        }
+        if self.__allow_cmd["help"]:
+            self.command(alias=["?"], doc=self.help.__doc__)(self.help)
+        if self.__allow_cmd["clear-host"]:
+            self.command(alias=["cls" if name == 'nt' else "clear"], name="clear-host", doc=self.clear_host.__doc__)(self.clear_host)
+        if self.__allow_cmd["leave"]:
+            self.command(alias=["exit"], doc=self.leave.__doc__)(self.leave)
+        if self.__allow_cmd["change_directory"]:
+            @self.command(alias=["cd"], doc=self.change_directory.__doc__)
+            @optional(self.__path)
+            def change_directory(path) -> None:
+                self.change_directory(path)
+
+    def allow(self, cmd: str, active: bool = True) -> None:
+        """Enable or disable built-in CLI commands.
+
+        Available commands that can be controlled:
+            - "help": Show available commands and their usage
+            - "leave": Exit the CLI
+            - "clear_host": Clear the terminal screen
+            - "change_directory": Change current working directory
+        Default commandes are enable.
+
+        Arguments:
+            cmd (str): Name of the command to enable/disable.
+            active (bool, optional): True to enable the command, False to disable it. Defaults to True.
+
+        Example:
+            >>> cli = WizardCLI.CLI()
+            >>> cli.allow("help", False)  # Disable help command
+            >>> cli.allow("leave", False) # Disable ability to exit
+            >>> cli.allow("clear_host", False) # Disable screen clearing
+            >>> cli.allow("change_directory", False) # Disable cd command
+
+            # Re-enable a command
+            >>> cli.allow("help", True)
+        """
+        if cmd in self.__allow_cmd:
+            self.__allow_cmd[cmd] = active
 
     def command(self,
                 name: Optional[str] = None,
@@ -172,19 +209,19 @@ class CLI:
         max_length = max(len(line.split(" - ")[0]) for line in lines) if not m else 0
         if not m:
             lines = [f"{cmd.ljust(max_length)} {cmds[cmd]['doc']}" for cmd in sorted(cmds)]
-        print(self.format("\n".join(lines)))
+        print(self.__strformat("\n".join(lines)))
 
     def change_directory(self, path: str) -> None:
         "Allows you to change the location of the terminal in your files."
-        npath = ospath.join(self.path, path)
+        npath = ospath.join(self.__path, path)
         if ospath.isdir(npath):
             path = ospath.normpath(npath)
         else:
             path = ospath.normpath(path)
         if ospath.isdir(path):
-            self.path = str(path).title()
+            self.__path = str(path).title()
         else:
-            print(self.format("The path is invalid."))
+            print(self.__strformat("The path is invalid."))
 
     def __decode(self, tpe: object, value: any) -> object:
         "Format arguments in the types chosen when creating commands."
@@ -242,7 +279,7 @@ class CLI:
             if arg.startswith("--"):
                 value = cmd["params"].get(arg)
                 if value is None:
-                    print(self.format("Unknown Parameter"))
+                    print(self.__strformat("Unknown Parameter"))
                     do = True
                     break
                 kwargs[arg[2:]] = None if index + 1 >= len(entry) else self.__decode(value[0], entry[index + 1])
@@ -253,10 +290,10 @@ class CLI:
                 else:
                     if arg == "-?":
                         do = True
-                        print(self.format(cmd["info"]))
+                        print(self.__strformat(cmd["info"]))
                         break
                     else:
-                        print(self.format("Unknown Option"))
+                        print(self.__strformat("Unknown Option"))
                         do = True
                         break
             else:
@@ -264,7 +301,7 @@ class CLI:
                     kwargs[cmd["args"][arg_i][0].strip("[]")] = self.__decode(cmd["args"][arg_i][1], arg)
                     arg_i += 1
                 else:
-                    print(self.format("Too many arguments provided."))
+                    print(self.__strformat("Too many arguments provided."))
                     do = True
                     break
             index += 1
@@ -275,12 +312,12 @@ class CLI:
         "This method of the CLI object allows you to launch the CLI after you have created all your commands."
         while True:
             try:
-                entry = splitS(input(self.prompt.format(self.user, self.path)))
+                entry = splitS(input(self.__prompt.format(self.user, self.__path)))
                 if not entry:
                     continue
                 cmd = self.__cmd.get(entry[0].lower())
                 if cmd is None:
-                    print(self.format(f"{entry[0]} doesn't exist.\nDo help to get the list of existing commands."))
+                    print(self.__strformat(f"{entry[0]} doesn't exist.\nDo help to get the list of existing commands."))
                     continue
                 if isinstance(cmd, str):
                     cmd = self.__cmd[cmd]
@@ -288,7 +325,7 @@ class CLI:
             except KeyboardInterrupt:
                 kill(getpid(), 9)
             except Exception as e:
-                print(self.format(f"An unexpected error occurred: {e}"))
+                print(self.__strformat(f"An unexpected error occurred: {e}"))
 
 
 def gradiant(
@@ -434,6 +471,13 @@ def optional(*defaults):
 
 
 class File:
+    __slots__ = (
+        '__name', '__ext', '__path', '__encoding', '__binary',
+        '__created', '__last_modif', '__perm', '__lines',
+        '__tasks', '__index', '__thread', '__lock',
+        '__processing', '__shutdown', '__current_path'
+    )
+
     def __init__(self, path: str, encoding: str = "UTF-8") -> None:
         """Allows you to manage files from their own type.
 
@@ -443,26 +487,36 @@ class File:
 
         Example of use:
             >>> import WizardCLI
-            >>> file = WizardCLI.file("test.txt", "UTF-8")
+            >>> file = WizardCLI.File("test.txt", "UTF-8")
         """
-        self.name, self.extention = ospath.splitext(ospath.basename(path))
-        self.path = ospath.dirname(path)
-        self.__encoding = encoding
-        if ospath.exists(self.name+self.extention) and ospath.isfile(path):
-            self.__binary = open(path, "rb").read()
-        else:
-            open(path, "wb").close()
-            self.__binary = b""
-        self.__created = ospath.getctime(path) if ospath.exists(path) else None
-        self.__last_modif = ospath.getmtime(path) if ospath.exists(path) else None
-        self.__perm = oct(stat(path).st_mode & 0o777) if ospath.exists(path) else None
-        self.__lines = self.split()
-        self.__running = False
+        self.__lock = Lock()
+        self.__thread = None
+        self.__processing = False
+        self.__shutdown = False
+        self.__index = 0
+        self.__lines = None
         self.__tasks = {
             "rename": None,
             "move": None,
-            "write": []
+            "wb": None,
+            "ab": None,
         }
+        self.__current_path = path
+        self.__name, self.__ext = ospath.splitext(ospath.basename(path))
+        self.__path = ospath.dirname(path)
+        self.__encoding = encoding
+
+        if ospath.exists(path) and ospath.isfile(path):
+            self.__binary = open(path, "rb").read()
+            self.__created = ospath.getctime(path)
+            self.__last_modif = ospath.getmtime(path)
+            self.__perm = oct(stat(path).st_mode & 0o777)
+        else:
+            self.__newt("wb", b"")
+            self.__binary = b""
+            self.__created = None
+            self.__last_modif = None
+            self.__perm = None
 
     @property
     def created(self) -> float:
@@ -475,140 +529,211 @@ class File:
         return self.__last_modif
 
     @property
-    def perm(self) -> float:
+    def perm(self) -> str:
         """Returns the permissions of the file."""
         return self.__perm
 
+    @property
+    def name(self) -> str:
+        """Returns name of the file."""
+        return self.__name
+
+    @property
+    def ext(self) -> str:
+        """Returns extention of the file."""
+        return self.__ext
+
     def __str__(self) -> str:
         """Returns the content of the file."""
-        return str(self.__binary.decode(encoding=self.__encoding))
-
-    def __bytes__(self) -> bytes:
-        """Returns the binary data of the file."""
-        return self.__binary
+        return self.__binary.decode(encoding=self.__encoding)
 
     def __repr__(self) -> str:
-        "Returns a string representation of the file."
-        return f"file(path='{self.name}{self.extention}', encoding='{self.__encoding}')"
+        """Returns a string representation of the file."""
+        return f"file(path='{self.__name}{self.__ext}', encoding='{self.__encoding}')"
 
-    def split(self, sep: str="\n", maxsplit: int = -1):
+    def split(self, sep: str = "\n", maxsplit: int = -1):
         "Splits the file into lines."
         return self.__str__().split(sep, maxsplit)
 
     def __bool__(self) -> bool:
-        "Returns True if the file is not empty."
+        """Returns True if the file is not empty."""
         return bool(self.__binary)
 
     def __len__(self) -> int:
-        "Returns the length of the file."
+        """Returns the length of the file."""
         return len(self.__binary)
 
     def __eq__(self, other: object) -> bool:
-        "Compares two files."
+        """Compares two files."""
         if isinstance(other, File):
-            return self.path == other.path and self.__data == other.__data
+            return self.__path == other.__path and self.__str__() == other.__str__()
         return False
 
     def __iter__(self) -> callable:
-        "Returns an iterator for the file."
-        self.index = 0
+        """Returns an iterator for the file."""
+        self.__index = 0
+        self.__lines = self.split()
         return self
 
     def __next__(self) -> Union[str, StopIteration]:
-        "Returns the next line in the file."
-        if self.index < len(self.__lines):
-            line = self.__lines[self.index]
-            self.index += 1
+        """Returns the next line in the file."""
+        if self.__index < len(self.__lines):
+            line = self.__lines[self.__index]
+            self.__index += 1
             return line
         else:
             raise StopIteration
 
     def __sub__(self, index: int) -> None:
-        "Removes data from the file by subtracting bytes from the end."
+        """Removes data from the file by subtracting bytes from the end."""
         if index < self.__len__():
             self.__binary = self.__binary[:-index]
-            self.__newt(self.__write, self.__binary, "wb")
+            self.__newt("wb", self.__binary)
         return self
 
-    def __add__(self, value: any) -> None:
-        "Adds data to the file by appending it."
-        self.append(value)
+    def __add__(self, value: Union[str, bytes]) -> None:
+        """Adds data to the file by appending it."""
+        if isinstance(value, str):
+            value = value.encode(self.__encoding)
+        self.__binary += value
+        self.__newt("ab", value)
         return self
-
-    def append(self, data: Union[str, bytes]) -> None:
-        "Appends data to the file."
-        if isinstance(data, str):
-            data = data.encode(self.__encoding)
-        elif not isinstance(data, bytes):
-            data = str(data).encode(self.__encoding)
-        self.__binary += data
-        self.__newt(self.__write, data, "ab")
 
     def clear(self) -> None:
-        "Clears the content of the file."
-        self.__newt(self.__write, "", "wb")
+        """Clears the content of the file."""
+        self.__binary = b""
+        self.__newt("wb", b"")
 
     def rename(self, name: str) -> None:
-        "Renames the file to the specified name."
-        self.__newt(rename, self.path+self.name+self.extention, self.path+name+self.extention)
-        self.name = name
+        """Renames the file to the specified name."""
+        if name != self.__name:
+            new_path = ospath.join(self.__path, f"{name}{self.__ext}")
+            self.__newt("rename", new_path, ospath.join(self.__path, f"{self.__name}{self.__ext}"))
+            self.__name = name
+            self.__current_path = new_path
 
-    def move(self, path: str) -> None:
-        "Moves the file to the specified path."
-        self.__newt(move, path+self.name+self.extention)
-        self.path = path
+    def move(self, new_path: str) -> None:
+        """Moves the file to the specified path."""
+        if new_path != self.__path:
+            target_path = ospath.join(new_path, f"{self.__name}{self.__ext}")
+            self.__newt("move", target_path, ospath.join(self.__path, f"{self.__name}{self.__ext}"))
+            self.__path = new_path
+            self.__current_path = target_path
 
     def find(self, value: str) -> int:
-        "Finds the index of the first occurrence of a value in the file."
+        """Finds the index of the first occurrence of a value in the file."""
         return self.__str__().find(value)
 
     def drop(self, value: str) -> None:
-        "Removes the first occurrence of a value from the file."
-        content = self.__str__().replace(value, "", 1)
-        self.__binary = content.encode(self.__encoding)
-        self.__newt(self.__write, self.__binary, "wb")
+        """Removes the first occurrence of a value from the file."""
+        content = self.__str__()
+        new_content = content.replace(value, "", 1)
+        if content != new_content:
+            self.__binary = new_content.encode(self.__encoding)
+            self.__newt("wb", self.__binary)
 
     def insert(self, index: int, data: Union[str, bytes]) -> None:
-        "Inserts data into the file at the specified index."
+        """Inserts data into the file at the specified index."""
         if isinstance(data, str):
             data = data.encode(self.__encoding)
-        elif not isinstance(data, bytes):
-            data = str(data).encode(self.__encoding)
         if index < 0 or index > len(self.__binary):
             raise IndexError("Index out of range")
         self.__binary = self.__binary[:index] + data + self.__binary[index:]
-        self.__newt(self.__write, self.__binary, "wb")
+        self.__newt("wb", self.__binary)
 
-    def __write(self, path: str, data: bytes, method: str = "wb") -> None:
-        "Writes binary data to the file at the specified path."
-        open(path, method).write(data)
+    def __newt(self, methode: callable, args, current_path: str = None) -> None:
+        """Schedules a task to be executed in a separate thread."""
+        with self.__lock:
+            match methode:
+                case "rename":
+                    if self.__tasks["move"]:
+                        self.__tasks["move"] = (args, current_path)
+                    else:
+                        self.__tasks["rename"] = (args, current_path)
+                case "move":
+                    self.__tasks["move"] = (args, current_path)
+                    self.__tasks["rename"] = None
+                case "wb":
+                    self.__tasks["wb"] = args
+                    self.__tasks["ab"] = None
+                case _:
+                    if self.__tasks["wb"]:
+                        self.__tasks["wb"] = self.__binary
+                    elif self.__tasks["ab"]:
+                        self.__tasks["ab"] += args
+                    else:
+                        self.__tasks["ab"] = args
 
-    def __newt(self, func: callable, *args) -> None:
-        "Schedules a task to be executed in a separate thread."
-        if func == rename:
-            self.__tasks["rename"] = (func, args)
-        elif func == move:
-            self.__tasks["move"] = (func, args)
-        elif func == self.__write:
-            if args[0] == "wb":
-                self.__tasks["write"] = [(func, args)]
-            else:
-                self.__tasks["write"].append((func, args))
-        if not self.__running:
-            self.__thread = Thread(target=self.__run).start()
+            if not self.__thread or not self.__thread.is_alive():
+                self.__thread = Thread(target=self.__run, daemon=True)
+                self.__processing = True
+                self.__thread.start()
 
     def __run(self) -> None:
         """Executes all scheduled tasks in a separate thread."""
-        self.__running = True
-        while self.__tasks["write"] or self.__tasks["rename"] or self.__tasks["move"]:
-            for key in ["rename", "move", "write"]:
-                if self.__tasks[key]:
-                    func, args = self.__tasks[key].pop(0)
-                    if key == "rename":
-                        func(*args)
-                    else:
-                        func(self.path+self.name+self.extention, *args)
-        self.__running = False
+        while self.__processing and not self.__shutdown:
+            sleep(0.05)
+            with self.__lock:
+                if not any(self.__tasks.values()):
+                    continue
+
+                tasks_to_execute = self.__tasks.copy()
+                self.__tasks = {
+                    "rename": None,
+                    "move": None,
+                    "wb": None,
+                    "ab": None,
+                }
+            if tasks_to_execute["rename"]:
+                new_path, current_path = tasks_to_execute["rename"]
+                rename(current_path, new_path)
+                self.__current_path = new_path
+            elif tasks_to_execute["move"]:
+                new_path, current_path = tasks_to_execute["move"]
+                move(current_path, new_path)
+                self.__current_path = new_path
+
+            current_path = self.__current_path
+            if tasks_to_execute["wb"]:
+                data, path = tasks_to_execute["wb"]
+                with open(path, "wb") as f:
+                    f.write(data)
+            elif tasks_to_execute["ab"]:
+                data, path = tasks_to_execute["ab"]
+                with open(path, "ab") as f:
+                    f.write(data)
+
+    def __del__(self) -> None:
+        """Destructor that ensures proper thread cleanup before object deletion."""
+        self.close()
+
+    def close(self) -> None:
+        """Ferme proprement le fichier."""
+        self.__shutdown = True
+        self.__processing = False
+        if self.__thread and self.__thread.is_alive():
+            self.__thread.join()
+
+    def __enter__(self):
+        """Context manager support."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Automatic cleanup in with statement."""
+        self.close()
+
+    def copy(self, new_path: str, overwrite: bool = False) -> Union['File', None]:
+        """Creates a copy of the file with advanced options."""
+        new_dir = ospath.dirname(new_path)
+        if not new_path.endswith(self.ext):
+            new_path += self.ext
+        if not ospath.exists(new_dir):
+            raise FileExistsError(f"Destination directory doesn't exist")
+        if ospath.exists(new_path) and not overwrite:
+            raise FileExistsError(f"Destination file already exists")
+
+        copy2(ospath.join(self.__path, f"{self.__name}{self.__ext}"), new_path)
+        return File(new_path, self.__encoding)
 
 
 def fg(color: Optional[Union[tuple, str, list, int]] = None) -> str:
@@ -756,6 +881,7 @@ def strk() -> str:
 
 
 class Benchmark:
+    __slots__ = ('__funcs', '__results', '__threads', '__repeat', '__args')
     def __init__(self, *args, repeat: Optional[int] = 1) -> None:
         """
         This object allows benchmarking of multiple functions.
@@ -781,6 +907,7 @@ class Benchmark:
         self.__args = args
 
     def add(self, func: callable, alias: Optional[str] = None) -> None:
+        """Add a function to the benchmark comparison."""
         name = alias if alias else func.__name__
         self.__funcs.append((func, name))
 
@@ -795,6 +922,7 @@ class Benchmark:
         self.__results[index] = (avg, asizeof.asizeof(out))
 
     def run(self) -> None:
+        """Execute the benchmark comparison and display results."""
         if not self.__funcs:
             print("Aucune fonction à tester.")
             return
